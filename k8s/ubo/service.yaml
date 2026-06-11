@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ubo-graph-service
+  namespace: aml-platform
+  labels:
+    app: ubo-graph-service
+spec:
+  selector:
+    app: ubo-graph-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  type: ClusterIP

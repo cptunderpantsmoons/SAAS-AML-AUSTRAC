@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="InternationalFundsTransferInstruction">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ReportId" type="xs:string"/>
+        <xs:element name="ReportingEntity" type="ReportingEntityType"/>
+        <xs:element name="TransferDetails" type="TransferDetailsType"/>
+        <xs:element name="OrderingCustomer" type="CustomerType" minOccurs="0"/>
+        <xs:element name="BeneficiaryCustomer" type="CustomerType" minOccurs="0"/>
+        <xs:element name="SourceDataHash" type="xs:string"/>
+        <xs:element name="CreatedAt" type="xs:dateTime"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ReportingEntityType">
+    <xs:sequence>
+      <xs:element name="Name" type="xs:string"/>
+      <xs:element name="ABN" type="xs:string"/>
+      <xs:element name="Sector" type="xs:string"/>
+      <xs:element name="ContactEmail" type="xs:string"/>
+      <xs:element name="ContactPhone" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransferDetailsType">
+    <xs:sequence>
+      <xs:element name="Amount" type="xs:decimal"/>
+      <xs:element name="Currency" type="xs:string"/>
+      <xs:element name="OrderingCountry" type="xs:string" minOccurs="0"/>
+      <xs:element name="DestinationCountry" type="xs:string" minOccurs="0"/>
+      <xs:element name="TransferDate" type="xs:date"/>
+      <xs:element name="TransactionPurpose" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CustomerType">
+    <xs:sequence>
+      <xs:element name="FullName" type="xs:string"/>
+      <xs:element name="Address" type="xs:string" minOccurs="0"/>
+      <xs:element name="AccountNumber" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

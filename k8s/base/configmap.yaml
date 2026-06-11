@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: document-detection-engine-config
+  namespace: aml-platform
+data:
+  AWS_REGION: ap-southeast-2
+  STORAGE_BACKEND: s3
+  STORAGE_BUCKET: aml-au-documents-sanitized
+  STORAGE_PREFIX: sanitized
+  PRESIGN_TTL_SECONDS: "900"
+  MAX_UPLOAD_BYTES: "10485760"
+  VISUAL_FORGERY_THRESHOLD: "0.75"
+  PROMPT_INJECTION_THRESHOLD: "0.70"
+  WHITESPACE_STEG_THRESHOLD: "0.65"

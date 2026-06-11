@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-monitoring
+  namespace: aml-platform
+  labels:
+    app: transaction-monitoring
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: transaction-monitoring
+  template:
+    metadata:
+      labels:
+        app: transaction-monitoring
+    spec:
+      serviceAccountName: transaction-monitoring
+      containers:
+        - name: transaction-monitoring
+          image: 123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/transaction-monitoring:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+              name: http
+          envFrom:
+            - configMapRef:
+                name: transaction-monitoring-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001

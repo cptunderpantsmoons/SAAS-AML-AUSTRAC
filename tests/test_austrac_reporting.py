@@ -6,6 +6,9 @@ from uuid import UUID
 import pytest
 from austrac_reporting.config import Settings
 from austrac_reporting.crypto_hash import compute_source_hash
+from austrac_reporting.generators.ifti_e import IFTIEGenerator
+from austrac_reporting.generators.smr import SMRGenerator
+from austrac_reporting.generators.ttr import TTRGenerator
 from austrac_reporting.models import (
     DeadLetterEntry,
     GatewayResult,
@@ -16,9 +19,30 @@ from austrac_reporting.models import (
     ReportType,
     SubjectDetails,
     SubjectType,
+    SuspicionGrounds,
     TransactionDetail,
 )
+from austrac_reporting.xml_schemas import XSDValidator
 from pydantic import ValidationError
+
+
+def _make_payload(report_type: ReportType, transactions: list[TransactionDetail] | None = None) -> ReportPayload:
+    entity = ReportingEntity(
+        name="Test Pty Ltd",
+        abn="12345678901",
+        sector="REMIT",
+        contact_email="test@test.com",
+        contact_phone="+61 2 9999 0000",
+    )
+    subject = SubjectDetails(subject_type=SubjectType.INDIVIDUAL, full_name="John Doe")
+    return ReportPayload(
+        report_type=report_type,
+        reporting_entity=entity,
+        subject=subject,
+        transactions=transactions or [],
+        source_data_hash="aabbccdd",
+        suspicion=SuspicionGrounds(grounds=["structuring", "smurfing"], risk_indicators=["rapid succession"]),
+    )
 
 
 class TestModels:
@@ -84,3 +108,108 @@ class TestConfig:
         assert s.gateway_timeout_seconds == 30.0
         assert s.dedup_cache_ttl_seconds == 3600
         assert s.llm_provider == "local_llama"
+
+
+class TestXSDValidation:
+    def test_validate_smr_valid(self) -> None:
+        xml = '''<?xml version="1.0"?>
+        <SuspiciousMatterReport>
+            <ReportId>r1</ReportId>
+            <ReportingEntity>
+                <Name>Test</Name><ABN>123</ABN><Sector>Remit</Sector>
+                <ContactEmail>a@b.com</ContactEmail><ContactPhone>+61</ContactPhone>
+            </ReportingEntity>
+            <Subject><SubjectType>individual</SubjectType><FullName>John</FullName></Subject>
+            <SuspicionDetails>
+                <Narrative>Test</Narrative>
+                <Grounds><Ground>G1</Ground></Grounds>
+            </SuspicionDetails>
+            <Transactions>
+                <Transaction>
+                    <TransactionId>T1</TransactionId><Date>2024-01-01</Date>
+                    <Amount>1000</Amount><Currency>AUD</Currency>
+                </Transaction>
+            </Transactions>
+            <SourceDataHash>abc123</SourceDataHash>
+            <CreatedAt>2024-01-01T00:00:00Z</CreatedAt>
+        </SuspiciousMatterReport>'''
+        valid, errors = XSDValidator.validate(ReportType.SMR, xml)
+        assert valid is True
+        assert errors == []
+
+    def test_validate_smr_invalid_missing_element(self) -> None:
+        xml = '''<?xml version="1.0"?>
+        <SuspiciousMatterReport>
+            <ReportId>r1</ReportId>
+            <ReportingEntity>
+                <Name>Test</Name><ABN>123</ABN><Sector>Remit</Sector>
+                <ContactEmail>a@b.com</ContactEmail><ContactPhone>+61</ContactPhone>
+            </ReportingEntity>
+        </SuspiciousMatterReport>'''
+        valid, errors = XSDValidator.validate(ReportType.SMR, xml)
+        assert valid is False
+        assert len(errors) > 0
+
+    def test_xsd_file_not_found(self) -> None:
+        import pytest
+        with pytest.raises(ValueError):
+            XSDValidator._load_schema(ReportType("nonexistent"))
+
+
+class TestSMRGenerator:
+    def test_smr_build_valid(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=5000, currency="AUD")
+        payload = _make_payload(ReportType.SMR, [tx])
+        gen = SMRGenerator(payload)
+        xml = gen.build(narrative="Test narrative")
+        assert "SuspiciousMatterReport" in xml
+        assert "Test narrative" in xml
+        valid, errors = XSDValidator.validate(ReportType.SMR, xml)
+        assert valid is True, errors
+
+    def test_smr_without_narrative(self) -> None:
+        tx = TransactionDetail(transaction_id="T2", date="2024-01-02", amount=3000, currency="AUD")
+        payload = _make_payload(ReportType.SMR, [tx])
+        gen = SMRGenerator(payload)
+        xml = gen.build()
+        assert "structuring" in xml
+        valid, errors = XSDValidator.validate(ReportType.SMR, xml)
+        assert valid is True, errors
+
+
+class TestTTRGenerator:
+    def test_ttr_build_valid(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=15000, currency="AUD", accounts=["ACC1"])
+        payload = _make_payload(ReportType.TTR, [tx])
+        gen = TTRGenerator(payload)
+        xml = gen.build()
+        assert "ThresholdTransactionReport" in xml
+        assert "ThresholdCrossed" in xml
+        assert "true" in xml
+        valid, errors = XSDValidator.validate(ReportType.TTR, xml)
+        assert valid is True, errors
+
+    def test_ttr_below_threshold(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=1000, currency="AUD")
+        payload = _make_payload(ReportType.TTR, [tx])
+        gen = TTRGenerator(payload)
+        xml = gen.build()
+        assert "false" in xml
+        valid, errors = XSDValidator.validate(ReportType.TTR, xml)
+        assert valid is True, errors
+
+
+class TestIFTIEGenerator:
+    def test_ifti_e_build_valid(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=25000, currency="USD")
+        payload = _make_payload(ReportType.IFTI_E, [tx])
+        payload.metadata = {
+            "ordering_country": "AU",
+            "destination_country": "US",
+            "ordering_customer": {"full_name": "John Doe", "address": "123 Main St"},
+        }
+        gen = IFTIEGenerator(payload)
+        xml = gen.build()
+        assert "InternationalFundsTransferInstruction" in xml
+        valid, errors = XSDValidator.validate(ReportType.IFTI_E, xml)
+        assert valid is True, errors

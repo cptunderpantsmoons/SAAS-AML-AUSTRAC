@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transaction-monitoring-config
+  namespace: aml-platform
+data:
+  AWS_REGION: ap-southeast-2
+  POSTGRES_DSN: "postgresql://postgres@aml-tx-monitoring.ap-southeast-2.rds.amazonaws.com:5432/aml_transactions"
+  WINDOW_DAYS: "7"
+  ANALYSIS_INTERVAL_SECONDS: "60"
+  RETENTION_YEARS: "7"

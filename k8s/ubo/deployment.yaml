@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubo-graph-service
+  namespace: aml-platform
+  labels:
+    app: ubo-graph-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ubo-graph-service
+  template:
+    metadata:
+      labels:
+        app: ubo-graph-service
+    spec:
+      serviceAccountName: ubo-graph-service
+      containers:
+        - name: ubo-graph-service
+          image: 123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/ubo-graph-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8002
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ubo-graph-service-config
+          env:
+            - name: NEO4J_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-credentials
+                  key: username
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-credentials
+                  key: password
+            - name: NEO4J_URI
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-credentials
+                  key: uri
+            - name: REDIS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: redis-ubo-connection
+                  key: auth_token
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ubo/healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/ubo/healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001

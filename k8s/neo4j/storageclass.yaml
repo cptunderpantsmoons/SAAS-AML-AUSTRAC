@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-neo4j
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: REPLACE_WITH_TERRAFORM_OUTPUT_efs_neo4j_file_system_id
+  directoryPerms: "700"
+  gidRangeStart: "7474"
+  gidRangeEnd: "7474"
+  basePath: "/neo4j"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
