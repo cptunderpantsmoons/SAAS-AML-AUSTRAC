@@ -4,11 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AML/CTF SaaS platform for AUSTRAC regulatory compliance, deployed in `ap-southeast-2`. Three main deliverables:
+AML/CTF SaaS platform for AUSTRAC regulatory compliance, deployed in `ap-southeast-2`. Main deliverables:
 
 - **Document Detection Engine** (`document_detection_engine/`) — Sprint 1; Starlette ASGI app that analyses uploaded documents for visual forgery, prompt injection, and whitespace steganography.
 - **Orchestration Layer** (`orchestration_layer/`) — Sprint 2; FastAPI app that runs the full onboarding pipeline (document analysis → KYC → sanctions screening → KYB → UBO → risk aggregation).
 - **UBO Graph Service** (`ubo_graph/`) — Sprint 3; Neo4j-backed beneficial-ownership calculator implementing AUSTRAC's 25% threshold methodology.
+- **Transaction Monitoring** (`transaction_monitoring/`) — Sprint 4; alert engine and rule scheduler.
+- **AUSTRAC Reporting** (`austrac_reporting/`) — Sprint 5; SMR/TTR/IFTI-E XML generators, LLM narrative drafting, secure API gateway with mTLS.
+- **Governance** (`governance/`) — Sprint 6; immutable audit trail, RLS policies, board dashboard, cryptographic signing.
+- **Compliance Agent** (`compliance_agent/`) — Sprint 7; Pydantic AI agent driving all microservices via natural language, with AgentMail.to inbox for document ingestion.
 
 ## Running Tests
 
@@ -42,7 +46,7 @@ Run a specific test:
 
 ```bash
 .venv/bin/ruff check .
-.venv/bin/mypy document_detection_engine/ orchestration_layer/ ubo_graph/
+.venv/bin/mypy document_detection_engine/ orchestration_layer/ ubo_graph/ compliance_agent/
 ```
 
 ## Running Services Locally
@@ -63,6 +67,12 @@ UBO Graph Service (Sprint 3):
 
 ```bash
 .venv/bin/uvicorn ubo_graph.app:app --host 0.0.0.0 --port 8002
+```
+
+Compliance Agent (Sprint 7; Pydantic AI agent with AgentMail.to inbox):
+
+```bash
+.venv/bin/uvicorn compliance_agent.app:app --host 0.0.0.0 --port 8006
 ```
 
 ## Build Container
@@ -114,6 +124,15 @@ Pipeline execution (`_run_pipeline` in `app.py`):
 - `ubo_service.py` — `UBOService.calculate(...)` walks upstream ownership from a given entity ID using a Neo4j graph client, aggregates effective ownership percentages per person, applies the AUSTRAC 25% threshold, handles trustee-deemed ownership for trusts, and returns a `UBOCalculationResult` with a SHA-256 result hash for audit integrity.
 - `db_client.py` — `Neo4jClient`; wraps `neo4j.GraphDatabase.driver` with query methods `entity_exists`, `ubo_paths`, and `trustee_deemed_ownership`.  Falls back to an in-memory graph for local dev / tests.
 - `graph_schema.py` — Cypher constraints and index creation for the ownership graph.
+
+### Compliance Agent (`compliance_agent/`)
+
+- `app.py` — FastAPI app with `/healthz`, `/agent/chat`, `/agent/tasks`, `/agent/ingestion/webhook`. Lifespan initializes `ComplianceServiceClient`, `AgentMailClient`, and starts a websocket inbox listener as a background task.
+- `agent.py` — Pydantic AI `Agent` with 10 tools mapping to the unified gateway (onboarding, document analysis, reporting, board metrics, alerts, UBO, signing). Uses `ComplianceServiceClient` as `deps_type`.
+- `service_client.py` — `ComplianceServiceClient` wrapping all downstream microservices via HTTP calls through the gateway.
+- `mail_client.py` — `AgentMailClient` wrapping the AgentMail.to SDK for inbox creation, outbound email, websocket subscription, and attachment downloads.
+- `ingestion.py` — `IngestionPipeline` processing inbound email attachments through document analysis and parsing natural-language instructions into agent tasks.
+- `config.py` / `models.py` — Settings and Pydantic models.
 
 ### Infrastructure
 
