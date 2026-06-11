@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import httpx
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import httpx
 from agentmail import AsyncAgentMail, MessageReceivedEvent, Subscribe
 from agentmail.attachments.types import SendAttachment
 from agentmail.core.events import EventType

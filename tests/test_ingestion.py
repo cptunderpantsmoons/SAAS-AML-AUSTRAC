@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 from agentmail import MessageReceivedEvent
 from agentmail.attachments.types import Attachment
@@ -14,7 +13,6 @@ from agentmail.messages.types.message import Message
 from agentmail.threads.types.thread_item import ThreadItem
 from compliance_agent.ingestion import (
     IngestionPipeline,
-    _download_bytes,
     _is_document,
     _parse_instructions,
     process_email,
@@ -378,34 +376,3 @@ class TestProcessEmail:
         assert len(pipeline._task_store) == 1
 
 
-@pytest.mark.asyncio
-class TestDownloadBytes:
-    async def test_returns_response_content(self) -> None:
-        with patch("compliance_agent.ingestion.httpx.AsyncClient") as mock_cls:
-            mock_client = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.content = b"hello"
-            mock_response.raise_for_status = MagicMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client.get = AsyncMock(return_value=mock_response)
-            mock_cls.return_value = mock_client
-
-            data = await _download_bytes("http://example.com/file")
-            assert data == b"hello"
-            mock_client.get.assert_awaited_once_with("http://example.com/file")
-
-    async def test_raises_on_http_error(self) -> None:
-        with patch("compliance_agent.ingestion.httpx.AsyncClient") as mock_cls:
-            mock_client = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError(
-                "not found", request=MagicMock(), response=MagicMock(status_code=404)
-            ))
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client.get = AsyncMock(return_value=mock_response)
-            mock_cls.return_value = mock_client
-
-            with pytest.raises(httpx.HTTPStatusError):
-                await _download_bytes("http://example.com/file")

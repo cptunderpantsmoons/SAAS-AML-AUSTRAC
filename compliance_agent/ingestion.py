@@ -8,7 +8,6 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import httpx
 from agentmail import MessageReceivedEvent
 
 from .mail_client import AgentMailClient
@@ -25,11 +24,10 @@ _INSTRUCTION_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
-async def _download_bytes(url: str) -> bytes:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.content
+def _sanitize_filename(filename: str) -> str:
+    name = Path(filename or "document.bin").name
+    safe = "".join(ch for ch in name if ch.isalnum() or ch in {".", "_", "-"})
+    return safe or "document.bin"
 
 
 def _is_document(filename: str | None) -> bool:
@@ -81,10 +79,8 @@ class IngestionPipeline:
             suffix = Path(attachment.filename).suffix if attachment.filename else ""
             fd, path = tempfile.mkstemp(suffix=suffix)
             try:
-                try:
-                    os.write(fd, data)
-                finally:
-                    os.close(fd)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
                 return path
             except Exception:
                 try:
@@ -106,7 +102,7 @@ class IngestionPipeline:
             with open(tmp_path, "rb") as f:
                 file_bytes = f.read()
             return await self._service_client.analyze_document(
-                file_bytes, filename or "document.bin", content_type or "application/octet-stream"
+                file_bytes, _sanitize_filename(filename or "document.bin"), content_type or "application/octet-stream"
             )
         except Exception:
             logger.exception("Document analysis failed for %s", filename)

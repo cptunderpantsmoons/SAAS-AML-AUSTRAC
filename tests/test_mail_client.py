@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
+import httpx
 import pytest
 from agentmail import MessageReceivedEvent
 from agentmail.core.events import EventType
@@ -384,3 +385,60 @@ class TestAclose:
             await task
         assert task.cancelled()
         mock_agent_mail.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+class TestDownloadAttachment:
+    async def test_successful_download(self, client: AgentMailClient, mock_agent_mail: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.download_url = "https://cdn.example.com/file.pdf"
+        mock_agent_mail.inboxes.messages.get_attachment = AsyncMock(return_value=mock_response)
+
+        with patch("compliance_agent.mail_client.httpx.AsyncClient") as mock_cls:
+            mock_http_client = AsyncMock()
+            mock_http_response = MagicMock()
+            mock_http_response.content = b"pdfdata"
+            mock_http_response.raise_for_status = MagicMock()
+            mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+            mock_http_client.__aexit__ = AsyncMock(return_value=None)
+            mock_http_client.get = AsyncMock(return_value=mock_http_response)
+            mock_cls.return_value = mock_http_client
+
+            data = await client.download_attachment({
+                "inbox_id": "inbox-1",
+                "message_id": "msg-1",
+                "attachment_id": "att-1",
+            })
+
+        assert data == b"pdfdata"
+        mock_agent_mail.inboxes.messages.get_attachment.assert_awaited_once_with(
+            "inbox-1", "msg-1", "att-1"
+        )
+        mock_http_client.get.assert_awaited_once_with("https://cdn.example.com/file.pdf")
+
+    async def test_download_failure(self, client: AgentMailClient, mock_agent_mail: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.download_url = "https://cdn.example.com/file.pdf"
+        mock_agent_mail.inboxes.messages.get_attachment = AsyncMock(return_value=mock_response)
+
+        with patch("compliance_agent.mail_client.httpx.AsyncClient") as mock_cls:
+            mock_http_client = AsyncMock()
+            mock_http_response = MagicMock()
+            mock_http_response.raise_for_status = MagicMock(
+                side_effect=httpx.HTTPStatusError(
+                    "not found",
+                    request=MagicMock(),
+                    response=MagicMock(status_code=404),
+                )
+            )
+            mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+            mock_http_client.__aexit__ = AsyncMock(return_value=None)
+            mock_http_client.get = AsyncMock(return_value=mock_http_response)
+            mock_cls.return_value = mock_http_client
+
+            with pytest.raises(httpx.HTTPStatusError):
+                await client.download_attachment({
+                    "inbox_id": "inbox-1",
+                    "message_id": "msg-1",
+                    "attachment_id": "att-1",
+                })
