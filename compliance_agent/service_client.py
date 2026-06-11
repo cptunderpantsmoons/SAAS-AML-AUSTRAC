@@ -129,14 +129,13 @@ class ComplianceServiceClient:
         return data
 
     async def sign_report(
-        self, report_id: str, payload: dict[str, Any], signed_by: str
+        self, report_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
         """POST /reports/{report_id}/sign"""
         path = f"/reports/{quote(report_id, safe='')}/sign"
-        body = {**payload, "signed_by": signed_by}
         resp = await self._client.post(
             f"{self._base_url}{path}",
-            json=body,
+            json=payload,
         )
         resp.raise_for_status()
         data: dict[str, Any] = resp.json()

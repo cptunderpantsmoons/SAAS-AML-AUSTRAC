@@ -5,17 +5,13 @@ from typing import Any
 
 from pydantic_ai import Agent, RunContext
 
-from .config import get_settings
 from .models import ChatResponse
 from .service_client import ComplianceServiceClient
 
 logger = logging.getLogger(__name__)
 
-# Simple in-memory session store mapping session_id -> list of task_ids.
-_session_store: dict[str, list[str]] = {}
-
 agent = Agent(
-    get_settings().agent_model,
+    "anthropic:claude-sonnet-4-6",
     instructions=(
         "You are a compliance officer AI assistant for an AUSTRAC AML/CTF SaaS platform. "
         "You help users with onboarding, document analysis, report generation, "
@@ -51,32 +47,12 @@ async def check_onboarding_status(
 @agent.tool
 async def analyze_document(
     ctx: RunContext[ComplianceServiceClient],
-    document_url: str | None = None,
-    base64_hint: str | None = None,
-    analysis_id: str | None = None,
+    file_bytes: bytes,
+    filename: str,
+    content_type: str,
 ) -> dict[str, Any]:
-    """Instruct the user to upload a document for analysis, or return an existing analysis_id."""
-    # When running over email the ingestion pipeline provides an analysis_id directly.
-    if analysis_id is not None:
-        return {"analysis_id": analysis_id, "status": "ingested"}
-
-    # For URL or base64 hints we currently ask the user to upload the real file.
-    if document_url is not None:
-        return {
-            "message": "Please upload the document directly so it can be analysed for "
-            "visual forgery, prompt injection, and whitespace steganography.",
-            "hint": document_url,
-        }
-
-    if base64_hint is not None:
-        return {
-            "message": "Please upload the document directly so it can be analysed.",
-            "hint": "base64",
-        }
-
-    return {
-        "message": "Please upload the document you would like analysed.",
-    }
+    """Analyze a document for visual forgery, prompt injection, and whitespace steganography."""
+    return await ctx.deps.analyze_document(file_bytes, filename, content_type)
 
 
 @agent.tool
@@ -141,34 +117,15 @@ async def sign_report(
     ctx: RunContext[ComplianceServiceClient],
     report_id: str,
     payload: dict[str, Any],
-    signed_by: str,
 ) -> dict[str, Any]:
     """Sign off a compliance report."""
-    return await ctx.deps.sign_report(report_id, payload, signed_by)
-
-
-def _get_session_task_ids(session_id: str) -> list[str]:
-    return _session_store.get(session_id, [])
-
-
-def _append_session_task_id(session_id: str, task_id: str) -> None:
-    if session_id not in _session_store:
-        _session_store[session_id] = []
-    _session_store[session_id].append(task_id)
+    return await ctx.deps.sign_report(report_id, payload)
 
 
 async def run_agent_chat(
     message: str,
     service_client: ComplianceServiceClient,
-    session_id: str | None = None,
 ) -> ChatResponse:
     """Run the compliance agent for a single chat turn."""
     result = await agent.run(message, deps=service_client)
-
-    task_ids: list[str] = []
-    if session_id is not None:
-        # Extract any task-like IDs from tool call results — for now we keep it simple.
-        # Future iterations may emit explicit AgentTask objects from tools.
-        task_ids = _get_session_task_ids(session_id)
-
-    return ChatResponse(response=str(result.output), task_ids=task_ids)
+    return ChatResponse(response=str(result.output), task_ids=[])

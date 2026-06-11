@@ -5,8 +5,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 from compliance_agent.agent import (
-    _append_session_task_id,
-    _get_session_task_ids,
     agent,
     run_agent_chat,
 )
@@ -21,6 +19,7 @@ def mock_client() -> ComplianceServiceClient:
     client = AsyncMock(spec=ComplianceServiceClient)
     client.onboard_entity.return_value = {"onboarding_id": "123"}
     client.check_onboarding_status.return_value = {"status": "COMPLETED"}
+    client.analyze_document.return_value = {"analysis_id": "a-1"}
     client.generate_report.return_value = {"report_id": "r-1"}
     client.draft_narrative.return_value = {"narrative": "Done"}
     client.transmit_report.return_value = {"transmitted": True}
@@ -53,23 +52,14 @@ class TestAgentTools:
         assert "COMPLETED" in result.output
 
     @pytest.mark.anyio
-    async def test_analyze_document_tool_returns_upload_message(self, mock_client: ComplianceServiceClient) -> None:
+    async def test_analyze_document_tool(self, mock_client: ComplianceServiceClient) -> None:
         result = await agent.run(
-            "Analyse document at http://example.com/file.pdf",
+            "Analyse document doc.pdf",
             deps=mock_client,
             model=TestModel(call_tools=["analyze_document"]),
         )
-        assert "upload" in result.output.lower()
-
-    @pytest.mark.anyio
-    async def test_analyze_document_tool_with_analysis_id(self, mock_client: ComplianceServiceClient) -> None:
-        result = await agent.run(
-            "Use analysis abc-123",
-            deps=mock_client,
-            model=TestModel(call_tools=["analyze_document"]),
-        )
-        # TestModel passes default args so the tool falls back to the generic upload message.
-        assert "upload" in result.output.lower()
+        mock_client.analyze_document.assert_awaited_once()  # type: ignore[attr-defined]
+        assert "a-1" in result.output
 
     @pytest.mark.anyio
     async def test_generate_report_tool(self, mock_client: ComplianceServiceClient) -> None:
@@ -150,19 +140,3 @@ class TestRunAgentChat:
         assert isinstance(resp, ChatResponse)
         assert isinstance(resp.response, str)
         assert resp.task_ids == []
-
-    @pytest.mark.anyio
-    async def test_run_agent_chat_with_session_id(self, mock_client: ComplianceServiceClient) -> None:
-        sess = "sess-abc"
-        _append_session_task_id(sess, "task-1")
-        with agent.override(model=TestModel()):
-            resp = await run_agent_chat("hello", mock_client, session_id=sess)
-        assert "task-1" in resp.task_ids
-
-
-class TestSessionStore:
-    def test_get_and_append(self) -> None:
-        sid = "test-session"
-        assert _get_session_task_ids(sid) == []
-        _append_session_task_id(sid, "t1")
-        assert _get_session_task_ids(sid) == ["t1"]

@@ -203,7 +203,7 @@ class TestSignReport:
     async def test_posts_correct_path_and_json(self) -> None:
         mock = _MockTransport(json_body={"signature": "ok"})
         client = _make_client(mock)
-        result = await client.sign_report("r-1", {"hash": "abc"}, "Officer X")
+        result = await client.sign_report("r-1", {"hash": "abc", "signed_by": "Officer X"})
         await client.aclose()
         assert result == {"signature": "ok"}
         req = mock.last_request
@@ -217,7 +217,7 @@ class TestSignReport:
     async def test_encodes_report_id_in_path(self) -> None:
         mock = _MockTransport(json_body={"signature": "ok"})
         client = _make_client(mock)
-        await client.sign_report("r?1", {"hash": "abc"}, "Officer X")
+        await client.sign_report("r?1", {"hash": "abc", "signed_by": "Officer X"})
         await client.aclose()
         req = mock.last_request
         assert req is not None
