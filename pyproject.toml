@@ -22,3 +22,7 @@ python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["agentmail"]
+ignore_missing_imports = true

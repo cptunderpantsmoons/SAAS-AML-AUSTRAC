@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
+import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from agentmail import AsyncAgentMail, MessageReceivedEvent, Subscribe
@@ -10,6 +11,8 @@ from agentmail.attachments.types import SendAttachment
 from agentmail.core.events import EventType
 
 from .config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class AgentMailClient:
@@ -25,10 +28,24 @@ class AgentMailClient:
         self._client = client or AsyncAgentMail(api_key=api_key)
         self._inbox_id: str | None = None
         self._email: str | None = None
+        self._tasks: set[asyncio.Task[None]] = set()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> AgentMailClient:
         return cls(api_key=settings.agentmail_api_key)
+
+    async def aclose(self) -> None:
+        """Clean up resources: cancel listener tasks and close the SDK client."""
+        self.stop_all()
+        if hasattr(self._client, "aclose"):
+            await self._client.aclose()
+
+    def stop_all(self) -> None:
+        """Cancel all tracked listener tasks."""
+        for task in self._tasks:
+            if not task.done():
+                task.cancel()
+        self._tasks.clear()
 
     async def create_inbox(self) -> tuple[str, str]:
         """Create a new AgentMail inbox and cache its ID for subsequent operations."""
@@ -57,7 +74,8 @@ class AgentMailClient:
 
     async def subscribe_inbound(
         self,
-        handler: Callable[[MessageReceivedEvent], Any],
+        handler: Callable[[MessageReceivedEvent], Any]
+        | Callable[[MessageReceivedEvent], Awaitable[Any]],
     ) -> asyncio.Task[None]:
         """Open a websocket to AgentMail and listen for inbound messages.
 
@@ -68,22 +86,34 @@ class AgentMailClient:
         if inbox_id is None:
             raise RuntimeError("No inbox available; call create_inbox() first.")
 
+        def _on_message(event: Any) -> None:
+            if isinstance(event, MessageReceivedEvent):
+                result = handler(event)
+                if inspect.isawaitable(result):
+                    task: asyncio.Task[None] = asyncio.create_task(result)  # type: ignore[arg-type]
+                    self._tasks.add(task)
+                    task.add_done_callback(self._tasks.discard)
+
         async def _listen() -> None:
-            async with self._client.websockets.connect() as socket:
-                await socket.send_subscribe(
-                    Subscribe(
-                        event_types=["message.received"],
-                        inbox_ids=[inbox_id],
+            try:
+                socket_ctx = self._client.websockets.connect()
+                if inspect.isawaitable(socket_ctx):
+                    socket_ctx = await socket_ctx
+                async with socket_ctx as socket:
+                    await socket.send_subscribe(
+                        Subscribe(
+                            event_types=["message.received"],
+                            inbox_ids=[inbox_id],
+                        )
                     )
-                )
 
-                async def _on_message(event: Any) -> None:
-                    if isinstance(event, MessageReceivedEvent):
-                        result = handler(event)
-                        if inspect.isawaitable(result):
-                            await result
+                    socket.on(EventType.MESSAGE, _on_message)
+                    await socket.start_listening()
+            except Exception:
+                logger.exception("Unhandled exception in AgentMail websocket listener")
+                raise
 
-                socket.on(EventType.MESSAGE, _on_message)
-                await socket.start_listening()
-
-        return asyncio.create_task(_listen())
+        task = asyncio.create_task(_listen())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
