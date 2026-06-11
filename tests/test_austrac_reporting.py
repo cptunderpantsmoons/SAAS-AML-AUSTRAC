@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+from typing import Any
 from uuid import UUID
 
+import httpx
 import pytest
 from austrac_reporting.config import Settings
 from austrac_reporting.crypto_hash import compute_source_hash
@@ -213,3 +215,87 @@ class TestIFTIEGenerator:
         assert "InternationalFundsTransferInstruction" in xml
         valid, errors = XSDValidator.validate(ReportType.IFTI_E, xml)
         assert valid is True, errors
+
+
+class TestPrompts:
+    def test_build_system_prompt_contains_json(self) -> None:
+        payload = _make_payload(ReportType.SMR)
+        from austrac_reporting.llm.prompts import build_system_prompt
+        prompt = build_system_prompt(payload)
+        assert "STRUCTURED PAYLOAD (JSON)" in prompt
+        assert "report_id" in prompt
+
+    def test_prompt_forbids_hallucination(self) -> None:
+        payload = _make_payload(ReportType.SMR)
+        from austrac_reporting.llm.prompts import build_system_prompt
+        prompt = build_system_prompt(payload)
+        assert "Do NOT hallucinate" in prompt
+
+
+class TestLocalLlamaAdapter:
+    @pytest.mark.asyncio
+    async def test_draft_narrative_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from austrac_reporting.llm.local_llama import LocalLlama3Adapter
+        from httpx import Response
+
+        adapter = LocalLlama3Adapter(api_url="http://localhost:11434/api/generate")
+        payload = _make_payload(ReportType.SMR)
+        from austrac_reporting.llm.prompts import build_system_prompt
+        prompt = build_system_prompt(payload)
+
+        async def mock_post(*args: Any, **kwargs: Any) -> Response:
+            return Response(200, json={"response": "Narrative text here."}, request=httpx.Request("POST", "http://test"))
+
+        monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+        draft = await adapter.draft_narrative(payload, prompt)
+        assert draft.draft_text == "Narrative text here."
+        assert draft.requires_human_approval is True
+        assert draft.model_used == "llama3"
+
+
+class TestAzureOpenAIAdapter:
+    @pytest.mark.asyncio
+    async def test_draft_narrative_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import os
+
+        from austrac_reporting.llm.azure_openai import AzureOpenAIAdapter
+        from httpx import Response
+
+        os.environ["AZURE_OPENAI_API_KEY"] = "test-key"
+        adapter = AzureOpenAIAdapter(endpoint="https://test.openai.azure.com", deployment="gpt-4")
+        payload = _make_payload(ReportType.SMR)
+        from austrac_reporting.llm.prompts import build_system_prompt
+        prompt = build_system_prompt(payload)
+
+        async def mock_post(*args: Any, **kwargs: Any) -> Response:
+            return Response(
+                200,
+                json={"choices": [{"message": {"content": "Azure narrative."}}]},
+                request=httpx.Request("POST", "http://test"),
+            )
+
+        monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+        draft = await adapter.draft_narrative(payload, prompt)
+        assert draft.draft_text == "Azure narrative."
+        assert draft.requires_human_approval is True
+        assert "azure-openai" in draft.model_used
+
+
+class TestLLMFactory:
+    def test_factory_defaults_to_local_llama(self) -> None:
+        from austrac_reporting.llm import create_llm_adapter
+        settings = Settings()
+        adapter = create_llm_adapter(settings)
+        from austrac_reporting.llm.local_llama import LocalLlama3Adapter
+        assert isinstance(adapter, LocalLlama3Adapter)
+
+    def test_factory_azure(self) -> None:
+        from austrac_reporting.llm import create_llm_adapter
+        settings = Settings(
+            llm_provider="azure_openai",
+            azure_openai_endpoint="https://test",
+            azure_openai_deployment="gpt-4",
+        )
+        adapter = create_llm_adapter(settings)
+        from austrac_reporting.llm.azure_openai import AzureOpenAIAdapter
+        assert isinstance(adapter, AzureOpenAIAdapter)
