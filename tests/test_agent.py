@@ -19,7 +19,7 @@ def mock_client() -> ComplianceServiceClient:
     client = AsyncMock(spec=ComplianceServiceClient)
     client.onboard_entity.return_value = {"onboarding_id": "123"}
     client.check_onboarding_status.return_value = {"status": "COMPLETED"}
-    client.analyze_document.return_value = {"analysis_id": "a-1"}
+    client.analyze_document_by_reference.return_value = {"analysis_id": "a-1"}
     client.generate_report.return_value = {"report_id": "r-1"}
     client.draft_narrative.return_value = {"narrative": "Done"}
     client.transmit_report.return_value = {"transmitted": True}
@@ -58,7 +58,7 @@ class TestAgentTools:
             deps=mock_client,
             model=TestModel(call_tools=["analyze_document"]),
         )
-        mock_client.analyze_document.assert_awaited_once()  # type: ignore[attr-defined]
+        mock_client.analyze_document_by_reference.assert_awaited_once()  # type: ignore[attr-defined]
         assert "a-1" in result.output
 
     @pytest.mark.anyio

@@ -26,3 +26,7 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = ["agentmail", "agentmail.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pydantic_ai", "pydantic_ai.*"]
+ignore_missing_imports = true

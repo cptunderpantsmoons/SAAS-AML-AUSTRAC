@@ -57,6 +57,22 @@ class ComplianceServiceClient:
         data: dict[str, Any] = resp.json()
         return data
 
+    async def analyze_document_by_reference(
+        self, document_reference_id: str, filename: str, content_type: str
+    ) -> dict[str, Any]:
+        """POST /documents/analyze-by-reference (reference-based analysis)."""
+        resp = await self._client.post(
+            f"{self._base_url}/documents/analyze-by-reference",
+            json={
+                "document_reference_id": document_reference_id,
+                "filename": filename,
+                "content_type": content_type,
+            },
+        )
+        resp.raise_for_status()
+        data: dict[str, Any] = resp.json()
+        return data
+
     async def analyze_document(
         self, file_bytes: bytes, filename: str, content_type: str
     ) -> dict[str, Any]:
