@@ -168,7 +168,7 @@ class TestCalculateUBO:
         assert req is not None
         assert req.method == "GET"
         assert req.url.path == "/ubo/calculate"
-        assert req.url.query == b"entity_id=ent-1&max_depth=5&threshold_percentage=25.0"
+        assert req.url.query == b"entity_id=ent-1"
 
 
 @pytest.mark.asyncio

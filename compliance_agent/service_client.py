@@ -111,11 +111,7 @@ class ComplianceServiceClient:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(
                 f"{self._base_url}/ubo/calculate",
-                params={
-                    "entity_id": entity_id,
-                    "max_depth": 5,
-                    "threshold_percentage": 25.0,
-                },
+                params={"entity_id": entity_id},
             )
             resp.raise_for_status()
             data: dict[str, Any] = resp.json()
