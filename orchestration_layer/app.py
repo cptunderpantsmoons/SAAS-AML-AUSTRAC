@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from auth import get_auth_settings, init_supertokens, setup_supertokens_middleware
+from auth.dependencies import get_session
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from orchestration_layer.adapters.circuit_breaker import CircuitBreaker
@@ -395,7 +399,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             latency_threshold_ms=settings.alert_latency_threshold_ms,
         )
 
-    app.include_router(router)
+    # Initialise SuperTokens session management (must happen before middleware)
+    auth_settings = get_auth_settings()
+    try:
+        init_supertokens(auth_settings)
+    except Exception:
+        logger.warning("SuperTokens init failed — auth endpoints may be unavailable")
+
+    # Attach SuperTokens middleware (must be before route registration)
+    setup_supertokens_middleware(app, enable=auth_settings.enable_middleware)
+
+    # CORS: allow frontend origin(s)
+    origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+    origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(public_router)
+    app.include_router(protected_router)
+    from orchestration_layer.gateway import gateway_router
+    app.include_router(gateway_router, dependencies=[Depends(get_session)])
     return app
 
 
@@ -406,20 +434,25 @@ router = FastAPI().router  # placeholder — we'll define routes below
 # Actually we need a real APIRouter:
 from fastapi import APIRouter  # noqa: E402
 
-router = APIRouter()
+# Public router (no auth required)
+public_router = APIRouter()
+# Protected router (session verification required)
+protected_router = APIRouter(dependencies=[Depends(get_session)])
 
 
-@router.get("/healthz")
+@public_router.get("/healthz")
 async def healthz() -> JSONResponse:
     return JSONResponse({"status": "ok", "service": "orchestration-layer"})
 
 
-@router.post(
+@protected_router.post(
     "/onboarding/initiate",
     response_model=InitiateOnboardingResponse,
     responses={400: {"model": ErrorResponse}},
 )
-async def initiate_onboarding(request: InitiateOnboardingRequest) -> InitiateOnboardingResponse:
+async def initiate_onboarding(
+    payload: InitiateOnboardingRequest,
+) -> InitiateOnboardingResponse:
     settings: Settings = get_settings()
     secrets = SecretsManagerClient(
         prefix=settings.secrets_manager_prefix,
@@ -429,9 +462,9 @@ async def initiate_onboarding(request: InitiateOnboardingRequest) -> InitiateOnb
     onboarding_id = str(uuid.uuid4())
     ws = WorkflowState(
         onboarding_id=onboarding_id,
-        entity_name=request.entity_name,
-        entity_type=request.entity_type,
-        country_code=request.country_code,
+        entity_name=payload.entity_name,
+        entity_type=payload.entity_type,
+        country_code=payload.country_code,
     )
     _store()[onboarding_id] = ws
 
@@ -451,12 +484,14 @@ async def initiate_onboarding(request: InitiateOnboardingRequest) -> InitiateOnb
     )
 
 
-@router.get(
+@protected_router.get(
     "/onboarding/status/{onboarding_id}",
     response_model=OnboardingStatusResponse,
     responses={404: {"model": ErrorResponse}},
 )
-async def get_onboarding_status(onboarding_id: str) -> OnboardingStatusResponse:
+async def get_onboarding_status(
+    onboarding_id: str,
+) -> OnboardingStatusResponse:
     ws = _store().get(onboarding_id)
     if not ws:
         raise HTTPException(status_code=404, detail=f"Onboarding {onboarding_id} not found")
@@ -480,15 +515,17 @@ async def get_onboarding_status(onboarding_id: str) -> OnboardingStatusResponse:
     )
 
 
-@router.post(
+@protected_router.post(
     "/kyc/verify",
     response_model=KYCVerifyResponse,
     responses={404: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
 )
-async def kyc_verify(request: KYCVerifyRequest) -> KYCVerifyResponse:
-    ws = _store().get(request.onboarding_id)
+async def kyc_verify(
+    payload: KYCVerifyRequest,
+) -> KYCVerifyResponse:
+    ws = _store().get(payload.onboarding_id)
     if not ws:
-        raise HTTPException(status_code=404, detail=f"Onboarding {request.onboarding_id} not found")
+        raise HTTPException(status_code=404, detail=f"Onboarding {payload.onboarding_id} not found")
 
     settings = get_settings()
     secrets = SecretsManagerClient(prefix=settings.secrets_manager_prefix, aws_region=settings.aws_region)
@@ -497,10 +534,10 @@ async def kyc_verify(request: KYCVerifyRequest) -> KYCVerifyResponse:
     kyc_adapter = await _create_kyc_adapter(settings, secrets, alert_dispatcher)
     try:
         result = await kyc_adapter.initiate_verification(
-            full_name=request.full_name,
-            document_type=request.document_type,
-            country_of_issue=request.country_of_issue,
-            date_of_birth=request.date_of_birth,
+            full_name=payload.full_name,
+            document_type=payload.document_type,
+            country_of_issue=payload.country_of_issue,
+            date_of_birth=payload.date_of_birth,
         )
     finally:
         await kyc_adapter.aclose()

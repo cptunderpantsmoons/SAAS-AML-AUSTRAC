@@ -12,3 +12,4 @@ resources:
   - ubo/
   - neo4j/
   - transaction_monitoring/
+  - austrac_reporting/

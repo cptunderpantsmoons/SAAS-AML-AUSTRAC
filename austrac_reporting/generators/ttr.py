@@ -38,9 +38,10 @@ class TTRGenerator(ReportXMLBuilder):
         self._build_transactions(root)
         self._build_source_hash(root)
         self._build_created_at(root)
-        return etree.tostring(
+        xml_bytes: bytes = etree.tostring(
             root,
             pretty_print=True,
             xml_declaration=True,
             encoding="UTF-8",
-        ).decode("utf-8")
+        )
+        return xml_bytes.decode("utf-8")

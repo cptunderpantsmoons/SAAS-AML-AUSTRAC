@@ -42,3 +42,18 @@ output "ubo_graph_irsa_role_arn" {
   description = "IAM role ARN for the UBO graph service Kubernetes service account."
   value       = aws_iam_role.ubo_graph_irsa.arn
 }
+
+output "nat_gateway_eip" {
+  description = "Static egress IP for AUSTRAC whitelist."
+  value       = aws_eip.nat.public_ip
+}
+
+output "austrac_dlq_url" {
+  description = "SQS DLQ URL for AUSTRAC reporting failures."
+  value       = aws_sqs_queue.dlq.url
+}
+
+output "austrac_reporting_irsa_role_arn" {
+  description = "IRSA role ARN for the AUSTRAC reporting service."
+  value       = aws_iam_role.austrac_reporting_irsa.arn
+}

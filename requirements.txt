@@ -11,6 +11,8 @@ neo4j>=5.0.0
 redis>=5.0.0
 pytest-asyncio>=0.24
 asyncpg>=0.30.0
+aiosqlite>=0.20.0
 lxml==5.3.0
+supertokens-python>=0.31.0
 pydantic-ai>=0.0.20
 agentmail>=0.1.0

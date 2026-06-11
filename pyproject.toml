@@ -16,6 +16,7 @@ src = ["document_detection_engine", "orchestration_layer", "ubo_graph", "transac
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -29,4 +30,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["pydantic_ai", "pydantic_ai.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["boto3"]
 ignore_missing_imports = true

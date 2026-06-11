@@ -6,6 +6,7 @@ from uuid import UUID
 
 import httpx
 import pytest
+from austrac_reporting.app import app
 from austrac_reporting.config import Settings
 from austrac_reporting.crypto_hash import compute_source_hash
 from austrac_reporting.generators.ifti_e import IFTIEGenerator
@@ -25,6 +26,7 @@ from austrac_reporting.models import (
     TransactionDetail,
 )
 from austrac_reporting.xml_schemas import XSDValidator
+from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
 
@@ -299,3 +301,156 @@ class TestLLMFactory:
         adapter = create_llm_adapter(settings)
         from austrac_reporting.llm.azure_openai import AzureOpenAIAdapter
         assert isinstance(adapter, AzureOpenAIAdapter)
+
+
+class TestGateway:
+    @pytest.mark.asyncio
+    async def test_transmit_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from austrac_reporting.gateway import AUSTRACGateway
+
+        gateway = AUSTRACGateway()
+        xml = _valid_smr_xml()
+
+        async def mock_post(*args: Any, **kwargs: Any) -> httpx.Response:
+            return httpx.Response(200, headers={"X-Receipt-Id": "REC-001"}, request=httpx.Request("POST", "http://test"))
+
+        monkeypatch.setattr("httpx.AsyncClient.post", mock_post)
+        result = await gateway.transmit("smr", xml, report_id=UUID(int=1))
+        assert result.status == "transmitted"
+        assert result.receipt_id == "REC-001"
+        assert result.http_status == 200
+        await gateway.close()
+
+    @pytest.mark.asyncio
+    async def test_transmit_validation_fails(self) -> None:
+        from austrac_reporting.gateway import AUSTRACGateway, GatewayError
+
+        gateway = AUSTRACGateway()
+        with pytest.raises(GatewayError) as exc_info:
+            await gateway.transmit("smr", "<invalid>", report_id=UUID(int=2))
+        assert "XSD validation failed" in str(exc_info.value)
+        await gateway.close()
+
+    @pytest.mark.asyncio
+    async def test_transmit_unknown_report_type(self) -> None:
+        from austrac_reporting.gateway import AUSTRACGateway, GatewayError
+
+        gateway = AUSTRACGateway()
+        with pytest.raises(GatewayError) as exc_info:
+            await gateway.transmit("unknown_type", _valid_smr_xml(), report_id=UUID(int=3))
+        assert "Unknown report type" in str(exc_info.value)
+        await gateway.close()
+
+
+class TestExponentialBackoff:
+    def test_backoff_base(self) -> None:
+        from austrac_reporting.dlq import exponential_backoff_delay
+        assert exponential_backoff_delay(0) == 5.0
+
+    def test_backoff_doubles(self) -> None:
+        from austrac_reporting.dlq import exponential_backoff_delay
+        assert exponential_backoff_delay(1) == 10.0
+        assert exponential_backoff_delay(2) == 20.0
+
+    def test_backoff_cap(self) -> None:
+        from austrac_reporting.dlq import exponential_backoff_delay
+        assert exponential_backoff_delay(20) == 3600.0
+
+
+class TestDeadLetterQueue:
+    def test_enqueue_in_memory(self) -> None:
+        import asyncio
+
+        from austrac_reporting.dlq import DeadLetterQueue
+
+        dlq = DeadLetterQueue(Settings(sqs_dlq_url=""))
+        asyncio.run(dlq.enqueue(UUID(int=1), {"report_type": "smr"}, "Network error"))
+        assert len(dlq.list_entries()) == 1
+        entry = dlq.list_entries()[0]
+        assert entry.retry_count == 0
+        assert entry.error_message == "Network error"
+        dlq.clear()
+
+    def test_requeue_increments_retry(self) -> None:
+        import asyncio
+        from datetime import UTC, datetime, timedelta
+
+        from austrac_reporting.dlq import DeadLetterQueue
+
+        dlq = DeadLetterQueue(Settings(sqs_dlq_url=""))
+        asyncio.run(dlq.enqueue(UUID(int=2), {"report_type": "smr"}, "Timeout"))
+        entry = dlq.list_entries()[0]
+        entry.next_retry_at = datetime.now(UTC) - timedelta(seconds=1)
+        asyncio.run(dlq.requeue_for_retry(entry))
+        all_entries = dlq.list_entries()
+        assert len(all_entries) == 2
+        retry_entry = next(e for e in all_entries if e.retry_count == 1)
+        assert retry_entry.retry_count == 1
+        dlq.clear()
+
+
+def _valid_smr_xml() -> str:
+    tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=5000, currency="AUD")
+    payload = _make_payload(ReportType.SMR, [tx])
+    gen = SMRGenerator(payload)
+    return gen.build(narrative="Test narrative")
+
+
+class TestAppRoutes:
+    @pytest.mark.asyncio
+    async def test_healthz(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/healthz")
+            assert response.status_code == 200
+            assert response.json()["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_generate_smr(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=5000, currency="AUD")
+        payload = _make_payload(ReportType.SMR, [tx])
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/reports/generate/smr",
+                json={"payload": payload.model_dump(mode="json"), "include_narrative": False},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["report_type"] == "smr"
+            assert data["xsd_valid"] is True
+            assert "xml_content" in data
+
+    @pytest.mark.asyncio
+    async def test_generate_ttr(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=15000, currency="AUD")
+        payload = _make_payload(ReportType.TTR, [tx])
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/reports/generate/ttr",
+                json={"payload": payload.model_dump(mode="json"), "include_narrative": False},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["report_type"] == "ttr"
+            assert data["xsd_valid"] is True
+
+    @pytest.mark.asyncio
+    async def test_generate_unknown_type(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=15000, currency="AUD")
+        payload = _make_payload(ReportType.TTR, [tx])
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/reports/generate/unknown",
+                json={"payload": payload.model_dump(mode="json"), "include_narrative": False},
+            )
+            assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_draft_narrative_requires_smr(self) -> None:
+        tx = TransactionDetail(transaction_id="T1", date="2024-01-01", amount=5000, currency="AUD")
+        payload = _make_payload(ReportType.TTR, [tx])
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/reports/narrative/draft",
+                json={"payload": payload.model_dump(mode="json"), "include_narrative": False},
+            )
+            assert response.status_code == 400

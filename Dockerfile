@@ -9,8 +9,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY auth ./auth
 COPY document_detection_engine ./document_detection_engine
 COPY orchestration_layer ./orchestration_layer
+COPY transaction_monitoring ./transaction_monitoring
+COPY austrac_reporting ./austrac_reporting
+COPY governance ./governance
+COPY ubo_graph ./ubo_graph
 
 EXPOSE 8000
 

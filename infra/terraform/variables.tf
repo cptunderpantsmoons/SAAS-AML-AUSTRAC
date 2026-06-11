@@ -101,3 +101,17 @@ variable "postgres_instance_class" {
   type        = string
   default     = "db.t3.micro"
 }
+
+variable "austrac_mtls_cert_pem" {
+  description = "AUSTRAC mTLS client certificate (PEM)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "austrac_mtls_key_pem" {
+  description = "AUSTRAC mTLS client private key (PEM)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

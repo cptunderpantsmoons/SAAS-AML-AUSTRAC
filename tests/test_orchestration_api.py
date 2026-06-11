@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+
+os.environ["SUPERTOKENS_ENABLE_MIDDLEWARE"] = "false"
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from orchestration_layer.app import _workflow_store, create_app
@@ -24,6 +28,16 @@ def app(settings: Settings):
 
 @pytest.fixture
 def client(app):
+    # Override SuperTokens session verification for tests
+    from auth.dependencies import get_session
+
+    async def _mock_session():
+        from unittest.mock import MagicMock
+        mock = MagicMock()
+        mock.get_user_id.return_value = "test-user-123"
+        return mock
+
+    app.dependency_overrides[get_session] = _mock_session
     transport = ASGITransport(app=app)
     return AsyncClient(transport=transport, base_url="http://test")
 
