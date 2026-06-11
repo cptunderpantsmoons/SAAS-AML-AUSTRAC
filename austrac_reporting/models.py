@@ -36,16 +36,16 @@ class ReportingEntity(BaseModel):
 
 class SubjectDetails(BaseModel):
     subject_type: SubjectType
-    full_name: str
+    full_name: str = Field(min_length=1)
     date_of_birth: str | None = None
     identifiers: list[dict[str, str]] = Field(default_factory=list)
     addresses: list[str] = Field(default_factory=list)
 
 
 class TransactionDetail(BaseModel):
-    transaction_id: str
+    transaction_id: str = Field(min_length=1)
     date: str
-    amount: float
+    amount: float = Field(gt=0.0)
     currency: str = "AUD"
     accounts: list[str] = Field(default_factory=list)
     description: str = ""

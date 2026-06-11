@@ -22,6 +22,14 @@ class Settings:
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     aws_region: str = os.getenv("AWS_REGION", "ap-southeast-2")
 
+    def __post_init__(self) -> None:
+        if self.max_transmit_retries < 0:
+            raise ValueError("max_transmit_retries must be non-negative")
+        if self.gateway_timeout_seconds <= 0:
+            raise ValueError("gateway_timeout_seconds must be positive")
+        if self.dedup_cache_ttl_seconds < 0:
+            raise ValueError("dedup_cache_ttl_seconds must be non-negative")
+
 
 def get_settings() -> Settings:
     return Settings()
