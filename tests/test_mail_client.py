@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
@@ -108,7 +109,7 @@ def _make_message_event() -> MessageReceivedEvent:
             thread_id="thread-1",
             message_id="msg-1",
             labels=[],
-            timestamp="2024-01-01T00:00:00Z",
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
             from_="a@b.com",
             to=["c@d.com"],
             subject="Test",
@@ -116,16 +117,16 @@ def _make_message_event() -> MessageReceivedEvent:
             attachments=[],
             headers={},
             size=100,
-            updated_at="2024-01-01T00:00:00Z",
-            created_at="2024-01-01T00:00:00Z",
+            updated_at=datetime(2024, 1, 1, tzinfo=UTC),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
         ),
         thread=ThreadItem(
             inbox_id="inbox-1",
             thread_id="thread-1",
             labels=[],
-            timestamp="2024-01-01T00:00:00Z",
-            received_timestamp="2024-01-01T00:00:00Z",
-            sent_timestamp="2024-01-01T00:00:00Z",
+            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+            received_timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+            sent_timestamp=datetime(2024, 1, 1, tzinfo=UTC),
             senders=["a@b.com"],
             recipients=["c@d.com"],
             subject="Test",
@@ -134,8 +135,8 @@ def _make_message_event() -> MessageReceivedEvent:
             last_message_id="msg-1",
             message_count=1,
             size=100,
-            updated_at="2024-01-01T00:00:00Z",
-            created_at="2024-01-01T00:00:00Z",
+            updated_at=datetime(2024, 1, 1, tzinfo=UTC),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
         ),
     )
 
