@@ -22,8 +22,6 @@ _DOCUMENT_EXTENSIONS = frozenset({".pdf", ".docx", ".jpeg", ".jpg", ".png"})
 _INSTRUCTION_PATTERNS: list[tuple[str, str]] = [
     (r"screen\s+(?:entity\s+)?(.+?)(?:\n|\.|$)", "screen_entity"),
     (r"generate\s+SMR\s+for\s+report\s+(.+?)(?:\n|\.|$)", "generate_smr"),
-    (r"generate\s+(?:an?\s+)?report\s+(.+?)(?:\n|\.|$)", "generate_report"),
-    (r"generate\s+(?:an?\s+)?(.+?)\s+report(?:\n|\.|$)", "generate_report"),
 ]
 
 
@@ -52,6 +50,11 @@ def _parse_instructions(body: str | None) -> list[dict[str, Any]]:
     return instructions
 
 
+async def process_email(event: MessageReceivedEvent, pipeline: IngestionPipeline) -> EmailIngestionResult:
+    """Module-level convenience wrapper around :meth:`IngestionPipeline._process_email`."""
+    return await pipeline._process_email(event)
+
+
 class IngestionPipeline:
     """Ingest inbound emails: extract attachments, analyse documents, parse NL instructions."""
 
@@ -66,17 +69,16 @@ class IngestionPipeline:
 
     async def _extract_attachment(
         self,
-        inbox_id: str,
-        message_id: str,
-        attachment_id: str,
-        filename: str | None,
+        message: Any,
+        attachment: Any,
     ) -> str | None:
         try:
-            response = await self._mail_client._client.inboxes.messages.get_attachment(
-                inbox_id, message_id, attachment_id
-            )
-            data = await _download_bytes(response.download_url)
-            suffix = Path(filename).suffix if filename else ""
+            data = await self._mail_client.download_attachment({
+                "inbox_id": message.inbox_id,
+                "message_id": message.message_id,
+                "attachment_id": attachment.attachment_id,
+            })
+            suffix = Path(attachment.filename).suffix if attachment.filename else ""
             fd, path = tempfile.mkstemp(suffix=suffix)
             try:
                 try:
@@ -91,7 +93,7 @@ class IngestionPipeline:
                     logger.exception("Failed to remove temp file after write failure")
                 raise
         except Exception:
-            logger.exception("Failed to extract attachment %s", attachment_id)
+            logger.exception("Failed to extract attachment %s", attachment.attachment_id)
             return None
 
     async def _analyze_document_file(
@@ -132,12 +134,7 @@ class IngestionPipeline:
 
         try:
             for attachment in attachments:
-                tmp_path = await self._extract_attachment(
-                    message.inbox_id,
-                    message.message_id,
-                    attachment.attachment_id,
-                    attachment.filename,
-                )
+                tmp_path = await self._extract_attachment(message, attachment)
                 if tmp_path:
                     tmp_paths.append(tmp_path)
                     if _is_document(attachment.filename):
@@ -155,7 +152,7 @@ class IngestionPipeline:
                 except OSError:
                     logger.exception("Failed to remove temp file %s", path)
 
-        body = message.text or message.extracted_text or message.preview or ""
+        body = message.text or ""
         instructions = _parse_instructions(body)
         self._schedule_tasks(instructions, message.message_id)
 

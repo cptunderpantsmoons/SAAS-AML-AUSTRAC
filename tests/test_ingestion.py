@@ -10,7 +10,6 @@ import httpx
 import pytest
 from agentmail import MessageReceivedEvent
 from agentmail.attachments.types import Attachment
-from agentmail.attachments.types.attachment_response import AttachmentResponse
 from agentmail.messages.types.message import Message
 from agentmail.threads.types.thread_item import ThreadItem
 from compliance_agent.ingestion import (
@@ -18,6 +17,7 @@ from compliance_agent.ingestion import (
     _download_bytes,
     _is_document,
     _parse_instructions,
+    process_email,
 )
 from compliance_agent.mail_client import AgentMailClient
 from compliance_agent.service_client import ComplianceServiceClient
@@ -41,7 +41,7 @@ def _make_message_event(
             from_="a@b.com",
             to=["c@d.com"],
             subject="Test",
-            preview=preview or "Preview",
+            preview=preview,
             text=text,
             attachments=attachments or [],
             headers={},
@@ -59,7 +59,7 @@ def _make_message_event(
             senders=["a@b.com"],
             recipients=["c@d.com"],
             subject="Test",
-            preview=preview or "Preview",
+            preview=preview,
             attachments=attachments or [],
             last_message_id="msg-1",
             message_count=1,
@@ -122,13 +122,6 @@ class TestParseInstructions:
         assert instructions[0]["type"] == "generate_smr"
         assert instructions[0]["target"] == "R-2024-001"
 
-    def test_generate_report(self) -> None:
-        body = "Generate a suspicious matter report"
-        instructions = _parse_instructions(body)
-        assert len(instructions) == 1
-        assert instructions[0]["type"] == "generate_report"
-        assert instructions[0]["target"] == "suspicious matter"
-
     def test_no_instructions(self) -> None:
         body = "Hello, please find the attached documents."
         instructions = _parse_instructions(body)
@@ -162,29 +155,19 @@ class TestProcessEmail:
 
     async def test_document_attachment_analyzed(self) -> None:
         pipeline, mock_mail, mock_service = _make_pipeline()
-        expiry = datetime(2026, 1, 1, tzinfo=UTC)
-        mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-            return_value=AttachmentResponse(
-                attachment_id="att-1",
-                filename="doc.pdf",
-                size=100,
-                download_url="http://example.com/dl",
-                expires_at=expiry,
-            )
-        )
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
 
-        with patch("compliance_agent.ingestion._download_bytes", new=AsyncMock(return_value=b"pdfdata")):
-            event = _make_message_event(
-                attachments=[
-                    Attachment(
-                        attachment_id="att-1",
-                        filename="doc.pdf",
-                        size=100,
-                        content_type="application/pdf",
-                    )
-                ]
-            )
-            result = await pipeline._process_email(event)
+        event = _make_message_event(
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="doc.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                )
+            ]
+        )
+        result = await pipeline._process_email(event)
 
         assert result.message_id == "msg-1"
         assert result.attachments_count == 1
@@ -195,39 +178,27 @@ class TestProcessEmail:
 
     async def test_non_document_attachment_ignored(self) -> None:
         pipeline, mock_mail, mock_service = _make_pipeline()
-        expiry = datetime(2026, 1, 1, tzinfo=UTC)
-        mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-            return_value=AttachmentResponse(
-                attachment_id="att-1",
-                filename="notes.txt",
-                size=50,
-                download_url="http://example.com/dl",
-                expires_at=expiry,
-            )
-        )
+        mock_mail.download_attachment = AsyncMock(return_value=b"textdata")
 
-        with patch("compliance_agent.ingestion._download_bytes", new=AsyncMock(return_value=b"textdata")):
-            event = _make_message_event(
-                attachments=[
-                    Attachment(
-                        attachment_id="att-1",
-                        filename="notes.txt",
-                        size=50,
-                        content_type="text/plain",
-                    )
-                ]
-            )
-            result = await pipeline._process_email(event)
+        event = _make_message_event(
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="notes.txt",
+                    size=50,
+                    content_type="text/plain",
+                )
+            ]
+        )
+        result = await pipeline._process_email(event)
 
         assert result.attachments_count == 1
         assert result.document_analysis_id is None
         mock_service.analyze_document.assert_not_awaited()
 
-    async def test_get_attachment_failure_graceful(self) -> None:
+    async def test_download_attachment_failure_graceful(self) -> None:
         pipeline, mock_mail, mock_service = _make_pipeline()
-        mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-            side_effect=RuntimeError("network error")
-        )
+        mock_mail.download_attachment = AsyncMock(side_effect=RuntimeError("network error"))
 
         event = _make_message_event(
             attachments=[
@@ -247,57 +218,34 @@ class TestProcessEmail:
 
     async def test_analyze_document_failure_graceful(self) -> None:
         pipeline, mock_mail, mock_service = _make_pipeline()
-        expiry = datetime(2026, 1, 1, tzinfo=UTC)
-        mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-            return_value=AttachmentResponse(
-                attachment_id="att-1",
-                filename="doc.pdf",
-                size=100,
-                download_url="http://example.com/dl",
-                expires_at=expiry,
-            )
-        )
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
         mock_service.analyze_document = AsyncMock(side_effect=RuntimeError("analysis failed"))
 
-        with patch("compliance_agent.ingestion._download_bytes", new=AsyncMock(return_value=b"pdfdata")):
-            event = _make_message_event(
-                attachments=[
-                    Attachment(
-                        attachment_id="att-1",
-                        filename="doc.pdf",
-                        size=100,
-                        content_type="application/pdf",
-                    )
-                ]
-            )
-            result = await pipeline._process_email(event)
+        event = _make_message_event(
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="doc.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                )
+            ]
+        )
+        result = await pipeline._process_email(event)
 
         assert result.attachments_count == 1
         assert result.document_analysis_id is None
 
     async def test_temp_files_cleaned_up(self) -> None:
-        pipeline, mock_mail, mock_service = _make_pipeline()
+        pipeline, _mock_mail, mock_service = _make_pipeline()
         fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
         os.write(fd, b"pdfdata")
         os.close(fd)
 
         try:
-            expiry = datetime(2026, 1, 1, tzinfo=UTC)
-            mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-                return_value=AttachmentResponse(
-                    attachment_id="att-1",
-                    filename="doc.pdf",
-                    size=100,
-                    download_url="http://example.com/dl",
-                    expires_at=expiry,
-                )
-            )
             mock_service.analyze_document = AsyncMock(return_value={"analysis_id": "anal-1"})
 
-            with (
-                patch("compliance_agent.ingestion._download_bytes", new=AsyncMock(return_value=b"pdfdata")),
-                patch.object(pipeline, "_extract_attachment", new=AsyncMock(return_value=tmp_path)),
-            ):
+            with patch.object(pipeline, "_extract_attachment", new=AsyncMock(return_value=tmp_path)):
                 event = _make_message_event(
                     attachments=[
                         Attachment(
@@ -317,16 +265,7 @@ class TestProcessEmail:
 
     async def test_first_document_analysis_id_returned(self) -> None:
         pipeline, mock_mail, mock_service = _make_pipeline()
-        expiry = datetime(2026, 1, 1, tzinfo=UTC)
-        mock_mail._client.inboxes.messages.get_attachment = AsyncMock(
-            return_value=AttachmentResponse(
-                attachment_id="att-1",
-                filename="doc.pdf",
-                size=100,
-                download_url="http://example.com/dl",
-                expires_at=expiry,
-            )
-        )
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
 
         side_effects = [
             {"analysis_id": "anal-1"},
@@ -334,24 +273,23 @@ class TestProcessEmail:
         ]
         mock_service.analyze_document = AsyncMock(side_effect=side_effects)
 
-        with patch("compliance_agent.ingestion._download_bytes", new=AsyncMock(return_value=b"pdfdata")):
-            event = _make_message_event(
-                attachments=[
-                    Attachment(
-                        attachment_id="att-1",
-                        filename="doc1.pdf",
-                        size=100,
-                        content_type="application/pdf",
-                    ),
-                    Attachment(
-                        attachment_id="att-2",
-                        filename="doc2.pdf",
-                        size=100,
-                        content_type="application/pdf",
-                    ),
-                ]
-            )
-            result = await pipeline._process_email(event)
+        event = _make_message_event(
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="doc1.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                ),
+                Attachment(
+                    attachment_id="att-2",
+                    filename="doc2.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                ),
+            ]
+        )
+        result = await pipeline._process_email(event)
 
         assert result.document_analysis_id == "anal-1"
         assert mock_service.analyze_document.await_count == 2
@@ -377,14 +315,66 @@ class TestProcessEmail:
         assert result.message_id == "msg-1"
         assert len(pipeline._task_store) == 2
 
-    async def test_preview_used_when_text_missing(self) -> None:
-        pipeline, _, _ = _make_pipeline()
+    async def test_filename_none_on_attachment(self) -> None:
+        pipeline, mock_mail, mock_service = _make_pipeline()
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
+
         event = _make_message_event(
-            preview="Generate report suspicious matter",
-            text=None,
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename=None,
+                    size=100,
+                    content_type="application/pdf",
+                )
+            ]
         )
         result = await pipeline._process_email(event)
+
+        assert result.attachments_count == 1
+        assert result.document_analysis_id is None
+        mock_service.analyze_document.assert_not_awaited()
+
+    async def test_analyze_document_without_analysis_id(self) -> None:
+        pipeline, mock_mail, mock_service = _make_pipeline()
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
+        mock_service.analyze_document = AsyncMock(return_value={"foo": "bar"})
+
+        event = _make_message_event(
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="doc.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                )
+            ]
+        )
+        result = await pipeline._process_email(event)
+
+        assert result.attachments_count == 1
+        assert result.document_analysis_id is None
+
+    async def test_process_email_module_level(self) -> None:
+        pipeline, mock_mail, _mock_service = _make_pipeline()
+        mock_mail.download_attachment = AsyncMock(return_value=b"pdfdata")
+
+        event = _make_message_event(
+            text="Screen entity Acme Corp.",
+            attachments=[
+                Attachment(
+                    attachment_id="att-1",
+                    filename="doc.pdf",
+                    size=100,
+                    content_type="application/pdf",
+                )
+            ],
+        )
+        result = await process_email(event, pipeline)
+
         assert result.message_id == "msg-1"
+        assert result.attachments_count == 1
+        assert result.document_analysis_id == "anal-1"
         assert len(pipeline._task_store) == 1
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import httpx
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -71,6 +72,23 @@ class AgentMailClient:
             text=body,
             attachments=attachments,
         )
+
+    async def download_attachment(self, attachment: Any) -> bytes:
+        """Fetch the raw bytes for a given attachment.
+
+        ``attachment`` must provide ``inbox_id``, ``message_id`` and
+        ``attachment_id`` (dict-like access is supported).
+        """
+        inbox_id = attachment["inbox_id"]
+        message_id = attachment["message_id"]
+        attachment_id = attachment["attachment_id"]
+        response = await self._client.inboxes.messages.get_attachment(
+            inbox_id, message_id, attachment_id
+        )
+        async with httpx.AsyncClient() as client:
+            r = await client.get(response.download_url)
+            r.raise_for_status()
+            return r.content
 
     async def subscribe_inbound(
         self,
