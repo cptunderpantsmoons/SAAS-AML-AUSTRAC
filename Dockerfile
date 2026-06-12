@@ -16,8 +16,6 @@ COPY transaction_monitoring ./transaction_monitoring
 COPY austrac_reporting ./austrac_reporting
 COPY governance ./governance
 COPY ubo_graph ./ubo_graph
-
-COPY governance ./governance
 COPY compliance_agent ./compliance_agent
 
 EXPOSE 8000

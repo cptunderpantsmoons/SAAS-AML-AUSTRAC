@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from austrac_reporting.config import Settings, get_settings
 from austrac_reporting.dlq import DeadLetterQueue
@@ -28,6 +29,7 @@ logger = logging.getLogger("austrac_reporting.app")
 _settings: Settings | None = None
 _gateway: AUSTRACGateway | None = None
 _dlq: DeadLetterQueue | None = None
+_report_registry: dict[UUID, dict[str, Any]] = {}
 
 
 @asynccontextmanager
@@ -91,7 +93,7 @@ async def generate_report(
 
     valid, errors = XSDValidator.validate(rt, xml)
 
-    return GenerateReportResponse(
+    response = GenerateReportResponse(
         report_id=payload.report_id,
         report_type=rt,
         xml_content=xml,
@@ -99,6 +101,17 @@ async def generate_report(
         xsd_valid=valid,
         validation_errors=errors,
     )
+    _report_registry[payload.report_id] = {
+        "id": str(payload.report_id),
+        "report_type": rt.value,
+        "status": "draft",
+        "xsd_valid": valid,
+        "validation_errors": errors,
+        "xml_content": xml,
+        "narrative": narrative.model_dump(mode="json") if narrative else None,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    return response
 
 
 @app.post("/reports/narrative/draft", response_model=NarrativeDraft)
@@ -113,6 +126,45 @@ async def draft_narrative(request: GenerateReportRequest) -> NarrativeDraft:
     except Exception as exc:
         logger.error("Narrative draft failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Narrative generation failed: {exc}") from exc
+
+
+@app.get("/reports")
+async def list_reports() -> dict[str, Any]:
+    return {
+        "reports": list(_report_registry.values()),
+        "pagination": {
+            "page": 1,
+            "limit": 50,
+            "total": len(_report_registry),
+            "totalPages": max(1, (len(_report_registry) + 49) // 50),
+        },
+    }
+
+
+@app.get("/reports/{report_id}")
+async def get_report(report_id: str) -> dict[str, Any]:
+    try:
+        rid = UUID(report_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid report ID") from exc
+    report = _report_registry.get(rid)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"report": report}
+
+
+@app.patch("/reports/{report_id}")
+async def update_report(report_id: str, request: Request) -> dict[str, Any]:
+    try:
+        rid = UUID(report_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid report ID") from exc
+    report = _report_registry.get(rid)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    body = await request.json()
+    report.update(body)
+    return {"id": report_id, **report}
 
 
 @app.post("/reports/{report_id}/transmit")

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from auth import get_auth_settings, init_supertokens, setup_supertokens_middleware
-from auth.dependencies import require_board_member, require_compliance_officer
+from auth.dependencies import get_session, require_board_member, require_compliance_officer
 from fastapi import Depends, FastAPI, HTTPException
 
 from governance.audit import AuditTrailService
@@ -83,6 +83,21 @@ async def approve_monthly_report(
     if _board_service is None:
         raise HTTPException(status_code=503, detail="Board service not initialized")
     return await _board_service.approve_monthly_report(month, approved_by)
+
+
+@app.get("/audit/logs")
+async def list_audit_logs(
+    event_type: str | None = None,
+    limit: int = 50,
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if _audit_service is None:
+        raise HTTPException(status_code=503, detail="Audit service not initialised")
+    logs = await _audit_service.query(event_type=event_type, limit=limit)
+    return {
+        "logs": [log.model_dump(mode="json") for log in logs],
+        "pagination": {"page": 1, "limit": limit, "total": len(logs), "totalPages": 1},
+    }
 
 
 @app.post("/reports/{report_id}/sign")

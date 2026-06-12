@@ -9,12 +9,18 @@ from transaction_monitoring.models import (
     AlertListResponse,
     AlertStatus,
     AssignAlertRequest,
+    CreateRuleRequest,
+    CreateTransactionRequest,
+    Rule,
+    Transaction,
     UpdateAlertStatusRequest,
 )
 
 app = FastAPI(title="Transaction Monitoring", version="0.4.0")
 
 _alerts: dict[str, Alert] = {}
+_rules: dict[str, Rule] = {}
+_transactions: dict[str, Transaction] = {}
 
 
 @app.get("/healthz")
@@ -72,3 +78,47 @@ async def update_alert_status(alert_id: str, request: UpdateAlertStatusRequest) 
     alert.updated_at = datetime.now(UTC)
     _alerts[alert_id] = alert
     return alert
+
+
+@app.get("/rules/list", response_model=list[Rule])
+async def list_rules() -> list[Rule]:
+    return list(_rules.values())
+
+
+@app.post("/rules", response_model=Rule)
+async def create_rule(request: CreateRuleRequest) -> Rule:
+    rule = Rule(
+        name=request.name,
+        description=request.description,
+        conditions=request.conditions,
+        base_severity=request.base_severity,
+        window_days=request.window_days,
+    )
+    _rules[str(rule.rule_id)] = rule
+    return rule
+
+
+@app.get("/transactions/list", response_model=list[Transaction])
+async def list_transactions(
+    onboarding_id: str | None = None,
+    limit: int = 50,
+) -> list[Transaction]:
+    txs = list(_transactions.values())
+    if onboarding_id:
+        txs = [t for t in txs if t.onboarding_id == onboarding_id]
+    return txs[:limit]
+
+
+@app.post("/transactions", response_model=Transaction)
+async def create_transaction(request: CreateTransactionRequest) -> Transaction:
+    tx = Transaction(
+        onboarding_id=request.onboarding_id,
+        amount=request.amount,
+        currency=request.currency,
+        sender_account=request.sender_account,
+        receiver_account=request.receiver_account,
+        timestamp=request.timestamp,
+        metadata=request.metadata,
+    )
+    _transactions[str(tx.transaction_id)] = tx
+    return tx

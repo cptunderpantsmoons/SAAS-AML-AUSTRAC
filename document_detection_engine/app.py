@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from starlette.applications import Starlette
 from starlette.datastructures import UploadFile
@@ -11,6 +13,8 @@ from starlette.routing import Route
 from document_detection_engine.config import Settings, get_settings
 from document_detection_engine.engine import analyze_document
 from document_detection_engine.storage import create_storage_client
+
+_document_registry: list[dict[str, Any]] = []
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -47,6 +51,20 @@ async def readyz(_: Request) -> JSONResponse:
     return JSONResponse({"status": "ready", "service": "document-detection-engine"})
 
 
+async def list_documents(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "documents": _document_registry,
+            "pagination": {
+                "page": 1,
+                "limit": 50,
+                "total": len(_document_registry),
+                "totalPages": max(1, (len(_document_registry) + 49) // 50),
+            },
+        }
+    )
+
+
 async def analyze(request: Request) -> JSONResponse:
     settings = request.app.state.settings
     storage_client = request.app.state.storage_client
@@ -67,6 +85,17 @@ async def analyze(request: Request) -> JSONResponse:
         settings=settings,
         storage_client=storage_client,
     )
+    summary = response.get("summary", {})
+    _document_registry.append(
+        {
+            "document_id": response.get("analysis_id", str(len(_document_registry) + 1)),
+            "filename": _sanitize_filename(upload.filename or "upload.bin"),
+            "analysis_id": response.get("analysis_id", ""),
+            "risk_score": summary.get("risk_score", 0.0),
+            "risk_level": summary.get("risk_level", "low"),
+            "uploaded_at": datetime.now(UTC).isoformat(),
+        }
+    )
     return JSONResponse(response)
 
 
@@ -77,6 +106,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
         routes=[
             Route("/healthz", endpoint=healthz, methods=["GET"]),
             Route("/readyz", endpoint=readyz, methods=["GET"]),
+            Route("/api/v1/documents", endpoint=list_documents, methods=["GET"]),
             Route("/api/v1/documents/analyze", endpoint=analyze, methods=["POST"]),
         ],
     )

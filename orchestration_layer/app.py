@@ -4,12 +4,13 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 from auth import get_auth_settings, init_supertokens, setup_supertokens_middleware
 from auth.dependencies import get_session
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -41,9 +42,10 @@ from orchestration_layer.state_machine import WorkflowStateMachine
 
 logger = logging.getLogger("orchestration_layer.app")
 
-# ── In-memory store (replace with DynamoDB / RDS for production) ────────────
+# ── In-memory stores (replace with DynamoDB / RDS for production) ───────────
 
 _workflow_store: dict[str, WorkflowState] = {}
+_client_registry: dict[str, dict[str, Any]] = {}
 
 
 def _store() -> dict[str, WorkflowState]:
@@ -550,6 +552,41 @@ async def kyc_verify(
         kyc_verification=result,
         updated_at=ws.updated_at,
     )
+
+
+@protected_router.get("/clients")
+async def list_clients() -> dict[str, Any]:
+    total = len(_client_registry)
+    total_pages = max(1, (total + 49) // 50)
+    return {
+        "clients": list(_client_registry.values()),
+        "pagination": {"page": 1, "limit": 50, "total": total, "totalPages": total_pages},
+    }
+
+
+@protected_router.post("/clients")
+async def create_client(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    client_id = body.get("client_id") or str(uuid.uuid4())
+    client = {"id": client_id, **body, "created_at": datetime.now(UTC).isoformat()}
+    _client_registry[client_id] = client
+    return client
+
+
+@protected_router.post("/onboarding/{case_id}/advance")
+async def advance_onboarding(case_id: str, request: Request) -> dict[str, Any]:
+    ws = _store().get(case_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail=f"Onboarding case {case_id} not found")
+    body = await request.json() if await request.body() else {}
+    trigger = body.get("trigger", "advance")
+    sm = WorkflowStateMachine(ws)
+    try:
+        sm.trigger(trigger)  # type: ignore[attr-defined]
+    except Exception as exc:
+        msg = f"Invalid transition '{trigger}' from state {ws.state}: {exc}"
+        raise HTTPException(status_code=400, detail=msg) from exc
+    return {"case_id": case_id, "state": ws.state, "advanced": True}
 
 
 # ── App instance ────────────────────────────────────────────────────────────
