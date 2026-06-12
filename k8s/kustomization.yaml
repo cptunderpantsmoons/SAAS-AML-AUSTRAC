@@ -13,3 +13,5 @@ resources:
   - neo4j/
   - transaction_monitoring/
   - austrac_reporting/
+  - governance/
+  - compliance_agent/

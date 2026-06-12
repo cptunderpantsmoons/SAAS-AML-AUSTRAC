@@ -6,7 +6,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from auth import init_supertokens, setup_supertokens_middleware
+from auth.config import get_auth_settings
+from auth.dependencies import get_session, require_role
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 
 from compliance_agent.agent import run_agent_chat
 from compliance_agent.config import Settings, get_settings
@@ -102,6 +105,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     if settings is not None:
         app.state.settings = settings
+
+    auth_settings = get_auth_settings()
+    try:
+        init_supertokens(auth_settings)
+    except Exception:
+        logger.warning("SuperTokens init failed — auth endpoints may be unavailable")
+
+    setup_supertokens_middleware(app, enable=auth_settings.enable_middleware)
+
     app.include_router(router)
     return app
 
@@ -114,7 +126,7 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok", "service": "compliance-agent"}
 
 
-@router.post("/agent/chat", response_model=ChatResponse)
+@router.post("/agent/chat", response_model=ChatResponse, dependencies=[Depends(require_role("compliance_officer"))])
 async def chat(request: ChatRequest) -> ChatResponse:
     if _compliance_client is None:
         raise HTTPException(status_code=503, detail="Service not initialised")
@@ -128,12 +140,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
     return response
 
 
-@router.get("/agent/tasks", response_model=list[AgentTask])
+@router.get("/agent/tasks", response_model=list[AgentTask], dependencies=[Depends(get_session)])
 async def list_tasks() -> list[AgentTask]:
     return list(_task_store.values())
 
 
-@router.get("/agent/tasks/{task_id}", response_model=AgentTask)
+@router.get("/agent/tasks/{task_id}", response_model=AgentTask, dependencies=[Depends(get_session)])
 async def get_task(task_id: str) -> AgentTask:
     task = _task_store.get(task_id)
     if task is None:
@@ -141,7 +153,11 @@ async def get_task(task_id: str) -> AgentTask:
     return task
 
 
-@router.post("/agent/ingestion/webhook", response_model=EmailIngestionResult)
+@router.post(
+    "/agent/ingestion/webhook",
+    response_model=EmailIngestionResult,
+    dependencies=[Depends(require_role("compliance_officer"))],
+)
 async def ingestion_webhook(payload: dict[str, Any]) -> EmailIngestionResult:
     if _ingestion_pipeline is None:
         raise HTTPException(status_code=503, detail="Ingestion pipeline not initialised")

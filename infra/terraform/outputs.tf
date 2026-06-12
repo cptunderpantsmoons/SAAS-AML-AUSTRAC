@@ -57,3 +57,13 @@ output "austrac_reporting_irsa_role_arn" {
   description = "IRSA role ARN for the AUSTRAC reporting service."
   value       = aws_iam_role.austrac_reporting_irsa.arn
 }
+
+output "compliance_agent_irsa_role_arn" {
+  description = "IRSA role ARN for the compliance agent Kubernetes service account."
+  value       = aws_iam_role.compliance_agent_irsa.arn
+}
+
+output "governance_irsa_role_arn" {
+  description = "IRSA role ARN for the governance Kubernetes service account."
+  value       = aws_iam_role.governance_irsa.arn
+}

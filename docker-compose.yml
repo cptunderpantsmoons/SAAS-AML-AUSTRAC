@@ -1,0 +1,108 @@
+version: "3.8"
+
+services:
+  # ── Main API gateway ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_API_DOMAIN=http://localhost:8000
+      - SUPERTOKENS_WEBSITE_DOMAIN=http://localhost:3000
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      - TX_MONITORING_URL=http://transaction-monitoring:8000
+      - REPORTING_URL=http://austrac-reporting:8000
+      - GOVERNANCE_URL=http://governance:8000
+      - DOCUMENT_ENGINE_URL=http://document-engine:8000
+      - UBO_GRAPH_URL=http://ubo-graph:8000
+    depends_on:
+      - transaction-monitoring
+      - austrac-reporting
+      - governance
+      - compliance-agent
+      - document-engine
+      - ubo-graph
+    networks:
+      - aml-network
+    command: ["uvicorn", "orchestration_layer.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ── Transaction Monitoring ────────────────────────────────────────────────
+  transaction-monitoring:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+    networks:
+      - aml-network
+    command: ["uvicorn", "transaction_monitoring.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ── AUSTRAC Reporting ─────────────────────────────────────────────────────
+  austrac-reporting:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+    networks:
+      - aml-network
+    command: ["uvicorn", "austrac_reporting.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ── Governance ────────────────────────────────────────────────────────────
+  governance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_API_DOMAIN=http://localhost:8000
+      - SUPERTOKENS_WEBSITE_DOMAIN=http://localhost:3000
+    networks:
+      - aml-network
+    command: ["uvicorn", "governance.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ── Compliance Agent ────────────────────────────────────────────────────────
+  compliance-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8006
+      - GATEWAY_URL=http://api:8000
+      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_API_DOMAIN=http://localhost:8006
+      - SUPERTOKENS_WEBSITE_DOMAIN=http://localhost:3000
+    networks:
+      - aml-network
+    command: ["uvicorn", "compliance_agent.app:app", "--host", "0.0.0.0", "--port", "8006"]
+
+  # ── Document Detection Engine ─────────────────────────────────────────────
+  document-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+    networks:
+      - aml-network
+    command: ["uvicorn", "document_detection_engine.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ── UBO Graph ────────────────────────────────────────────────────────────
+  ubo-graph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8000
+    networks:
+      - aml-network
+    command: ["uvicorn", "ubo_graph.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+networks:
+  aml-network:
+    driver: bridge

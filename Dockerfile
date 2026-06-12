@@ -17,6 +17,9 @@ COPY austrac_reporting ./austrac_reporting
 COPY governance ./governance
 COPY ubo_graph ./ubo_graph
 
+COPY governance ./governance
+COPY compliance_agent ./compliance_agent
+
 EXPOSE 8000
 
 # Default: run the orchestration layer (which calls the detection engine)

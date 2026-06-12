@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-agent
+  namespace: aml-platform
+spec:
+  selector:
+    app: compliance-agent
+  ports:
+    - port: 8006
+      targetPort: 8006
+      name: http

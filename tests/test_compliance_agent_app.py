@@ -6,12 +6,27 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from auth.config import AuthSettings, get_auth_settings
+from auth.dependencies import get_session
 from compliance_agent.app import create_app
 from compliance_agent.config import Settings
 from compliance_agent.ingestion import IngestionPipeline
 from compliance_agent.mail_client import AgentMailClient
 from compliance_agent.models import AgentTask, ChatResponse, EmailIngestionResult
 from compliance_agent.service_client import ComplianceServiceClient
+
+
+def _mock_auth(app: Any) -> None:
+    """Override auth dependencies so tests can call protected routes without a real session."""
+
+    async def _mock_session() -> Any:
+        mock = MagicMock()
+        mock.get_user_id.return_value = "test-user"
+        mock.get_access_token_payload.return_value = {"st-role": {"v": ["compliance_officer"]}}
+        return mock
+
+    app.dependency_overrides[get_session] = _mock_session
+    app.dependency_overrides[get_auth_settings] = lambda: AuthSettings(enable_middleware=False)
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +37,19 @@ def reset_app_globals(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "_mail_client", None)
     monkeypatch.setattr(app_module, "_ingestion_pipeline", None)
     monkeypatch.setattr(app_module, "_task_store", {})
+
+
+@pytest.fixture(autouse=True)
+def mock_supertokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("compliance_agent.app.init_supertokens", lambda *args, **kwargs: None)
+    monkeypatch.setattr("compliance_agent.app.setup_supertokens_middleware", lambda *args, **kwargs: None)
+
+    async def _mock_get_roles_for_user(*args: Any, **kwargs: Any) -> Any:
+        mock = MagicMock()
+        mock.roles = ["compliance_officer"]
+        return mock
+
+    monkeypatch.setattr("supertokens_python.recipe.userroles.asyncio.get_roles_for_user", _mock_get_roles_for_user)
 
 
 @pytest.fixture
@@ -161,6 +189,7 @@ class TestChat:
         monkeypatch.setattr(app_module, "run_agent_chat", _mock_run)
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/agent/chat", json={"message": "Hi"})
@@ -176,6 +205,7 @@ class TestChat:
         app_module._compliance_client = MagicMock(spec=ComplianceServiceClient)
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/agent/chat", json={"message": ""})
@@ -186,6 +216,7 @@ class TestChat:
         app_module._compliance_client = None
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/agent/chat", json={"message": "Hi"})
@@ -202,6 +233,7 @@ class TestListTasks:
         app_module._task_store["task-1"] = AgentTask(task_id="task-1", status="completed")
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/agent/tasks")
@@ -216,6 +248,7 @@ class TestListTasks:
         app_module._compliance_client = MagicMock(spec=ComplianceServiceClient)
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/agent/tasks")
@@ -230,6 +263,7 @@ class TestGetTask:
         app_module._task_store["task-1"] = AgentTask(task_id="task-1", status="completed")
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/agent/tasks/task-1")
@@ -242,6 +276,7 @@ class TestGetTask:
         app_module._compliance_client = MagicMock(spec=ComplianceServiceClient)
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/agent/tasks/missing")
@@ -265,6 +300,7 @@ class TestIngestionWebhook:
         app_module._ingestion_pipeline = mock_pipeline
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
@@ -301,6 +337,7 @@ class TestIngestionWebhook:
         app_module._ingestion_pipeline = None
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/agent/ingestion/webhook", json={"message": {}})
@@ -312,6 +349,7 @@ class TestIngestionWebhook:
         app_module._ingestion_pipeline = mock_pipeline
 
         app = create_app()
+        _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             # Non-dict attachment causes AttributeError during construction

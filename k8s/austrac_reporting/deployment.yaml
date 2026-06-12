@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: austrac-reporting
+  namespace: aml-platform
+  labels:
+    app: austrac-reporting
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: austrac-reporting
+  template:
+    metadata:
+      labels:
+        app: austrac-reporting
+    spec:
+      serviceAccountName: austrac-reporting
+      containers:
+        - name: austrac-reporting
+          image: 123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/austrac-reporting:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8004
+              name: http
+          envFrom:
+            - configMapRef:
+                name: austrac-reporting-config
+          env:
+            - name: SQS_DLQ_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: austrac-reporting-config
+                  key: SQS_DLQ_URL
+                  optional: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001

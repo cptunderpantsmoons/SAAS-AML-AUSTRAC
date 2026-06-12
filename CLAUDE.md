@@ -46,7 +46,7 @@ Run a specific test:
 
 ```bash
 .venv/bin/ruff check .
-.venv/bin/mypy document_detection_engine/ orchestration_layer/ ubo_graph/ compliance_agent/
+.venv/bin/mypy document_detection_engine/ orchestration_layer/ ubo_graph/ compliance_agent/ governance/
 ```
 
 ## Running Services Locally
@@ -140,6 +140,14 @@ Pipeline execution (`_run_pipeline` in `app.py`):
 - `infra/cloudformation/` — `sprint1.yaml` CloudFormation alternative.
 - `k8s/` — Kubernetes manifests for EKS deployment.
 - `scripts/` — `deploy_sprint1.py`, `render_sprint1_k8s.py`, `verify_quality_gate.py`.
+
+## Sprint 8: Infrastructure & Auth Hardening
+
+- `compliance_agent/app.py` now initializes SuperTokens (`init_supertokens`) and attaches middleware (`setup_supertokens_middleware`) in `create_app()`.
+- Role-based access control: `/agent/chat` and `/agent/ingestion/webhook` require `compliance_officer` role. `/agent/tasks*` require any authenticated session.
+- K8s manifests added for `compliance_agent/` and `governance/` (both were missing from `k8s/`).
+- Terraform `sprint7.tf` adds ECR repo + IRSA role for compliance-agent and governance.
+- Dockerfile now copies `governance/` and `compliance_agent/`.
 
 ## Important Patterns
 

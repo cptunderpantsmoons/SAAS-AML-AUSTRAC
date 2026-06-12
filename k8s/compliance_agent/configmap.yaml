@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-agent-config
+  namespace: aml-platform
+data:
+  GATEWAY_URL: "http://orchestration-layer.aml-platform.svc.cluster.local:8000"
+  AGENT_TIMEOUT_SECONDS: "30.0"
+  AGENT_MODEL: "anthropic:claude-sonnet-4-6"
+  AWS_REGION: "ap-southeast-2"
+  SUPERTOKENS_CONNECTION_URI: "https://srv1603169.hstgr.cloud"
+  SUPERTOKENS_API_DOMAIN: "http://compliance-agent.aml-platform.svc.cluster.local:8006"
