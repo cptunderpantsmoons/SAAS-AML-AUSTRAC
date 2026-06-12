@@ -111,3 +111,4 @@ networks:
     driver: bridge
   supertokens-network:
     external: true
+    name: supertokens-i0th_default
