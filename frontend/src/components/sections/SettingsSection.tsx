@@ -858,15 +858,7 @@ interface UserRecord {
   department: string;
 }
 
-const DEFAULT_USERS: UserRecord[] = [
-  { id: 'u1', name: 'Sarah Chen', email: 'sarah.chen@complianceguard.com.au', role: 'MLRO', status: 'active', lastLogin: new Date(Date.now() - 1800000).toISOString(), mfaEnabled: true, department: 'Compliance' },
-  { id: 'u2', name: 'James Wilson', email: 'james.wilson@complianceguard.com.au', role: 'Compliance Officer', status: 'active', lastLogin: new Date(Date.now() - 7200000).toISOString(), mfaEnabled: true, department: 'Compliance' },
-  { id: 'u3', name: 'Emily Brown', email: 'emily.brown@complianceguard.com.au', role: 'Analyst', status: 'active', lastLogin: new Date(Date.now() - 14400000).toISOString(), mfaEnabled: false, department: 'Risk' },
-  { id: 'u4', name: 'Michael Taylor', email: 'michael.taylor@complianceguard.com.au', role: 'Auditor', status: 'active', lastLogin: new Date(Date.now() - 86400000).toISOString(), mfaEnabled: true, department: 'Audit' },
-  { id: 'u5', name: 'Admin Taylor', email: 'admin.taylor@complianceguard.com.au', role: 'Admin', status: 'active', lastLogin: new Date(Date.now() - 600000).toISOString(), mfaEnabled: true, department: 'IT' },
-  { id: 'u6', name: 'Rachel Kim', email: 'rachel.kim@complianceguard.com.au', role: 'Analyst', status: 'inactive', lastLogin: new Date(Date.now() - 604800000).toISOString(), mfaEnabled: false, department: 'Risk' },
-  { id: 'u7', name: 'David Park', email: 'david.park@complianceguard.com.au', role: 'Compliance Officer', status: 'suspended', lastLogin: new Date(Date.now() - 2592000000).toISOString(), mfaEnabled: true, department: 'Compliance' },
-];
+const DEFAULT_USERS: UserRecord[] = [];
 
 const ROLE_COLORS: Record<string, string> = {
   Admin: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
@@ -1220,7 +1212,7 @@ function UserManagementTab() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[10px] font-medium">Email</Label>
-                            <Input type="email" placeholder="e.g. john@complianceguard.com.au" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="h-8 text-xs" />
+                            <Input type="email" placeholder="e.g. john@example.com.au" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="h-8 text-xs" />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[10px] font-medium">Role</Label>
@@ -1918,23 +1910,7 @@ interface AuditChangeEntry {
   ipAddress: string;
 }
 
-const MOCK_AUDIT_ENTRIES: AuditChangeEntry[] = [
-  { id: 'ac1', timestamp: new Date(Date.now() - 300000).toISOString(), user: 'Sarah Chen', userRole: 'MLRO', settingChanged: 'Risk Appetite Threshold', previousValue: '30%', newValue: '25%', ipAddress: '103.42.168.22' },
-  { id: 'ac2', timestamp: new Date(Date.now() - 1800000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'Auto-Escalation', previousValue: 'Disabled', newValue: 'Enabled', ipAddress: '103.42.168.10' },
-  { id: 'ac3', timestamp: new Date(Date.now() - 3600000).toISOString(), user: 'James Wilson', userRole: 'Compliance Officer', settingChanged: 'CDD Level', previousValue: 'Simplified', newValue: 'Standard', ipAddress: '103.42.168.35' },
-  { id: 'ac4', timestamp: new Date(Date.now() - 7200000).toISOString(), user: 'Sarah Chen', userRole: 'MLRO', settingChanged: 'SMR Filing Deadline', previousValue: '72 hours', newValue: '24 hours', ipAddress: '103.42.168.22' },
-  { id: 'ac5', timestamp: new Date(Date.now() - 14400000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'Role Permissions (Analyst)', previousValue: 'View Only', newValue: 'View + Generate Reports', ipAddress: '103.42.168.10' },
-  { id: 'ac6', timestamp: new Date(Date.now() - 28800000).toISOString(), user: 'Emily Brown', userRole: 'Analyst', settingChanged: 'Monitoring Frequency', previousValue: 'Monthly', newValue: 'Weekly', ipAddress: '10.0.1.55' },
-  { id: 'ac7', timestamp: new Date(Date.now() - 43200000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'Data Retention Period', previousValue: '5 years', newValue: '7 years', ipAddress: '103.42.168.10' },
-  { id: 'ac8', timestamp: new Date(Date.now() - 86400000).toISOString(), user: 'Sarah Chen', userRole: 'MLRO', settingChanged: 'EDD Trigger: Adverse Media', previousValue: 'Disabled', newValue: 'Enabled', ipAddress: '103.42.168.22' },
-  { id: 'ac9', timestamp: new Date(Date.now() - 129600000).toISOString(), user: 'James Wilson', userRole: 'Compliance Officer', settingChanged: 'Quiet Hours', previousValue: 'Disabled', newValue: '22:00-07:00', ipAddress: '103.42.168.35' },
-  { id: 'ac10', timestamp: new Date(Date.now() - 172800000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'Auto-Purge', previousValue: 'Enabled', newValue: 'Disabled', ipAddress: '103.42.168.10' },
-  { id: 'ac11', timestamp: new Date(Date.now() - 259200000).toISOString(), user: 'Michael Taylor', userRole: 'Auditor', settingChanged: 'TTR Reporting Window', previousValue: '5 business days', newValue: '3 business days', ipAddress: '10.0.1.80' },
-  { id: 'ac12', timestamp: new Date(Date.now() - 345600000).toISOString(), user: 'Sarah Chen', userRole: 'MLRO', settingChanged: 'Risk Assessment Methodology', previousValue: 'Simple scoring', newValue: 'Matrix-based', ipAddress: '103.42.168.22' },
-  { id: 'ac13', timestamp: new Date(Date.now() - 432000000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'MFA Policy (David Park)', previousValue: 'Enabled', newValue: 'Disabled', ipAddress: '103.42.168.10' },
-  { id: 'ac14', timestamp: new Date(Date.now() - 518400000).toISOString(), user: 'James Wilson', userRole: 'Compliance Officer', settingChanged: 'EDD Trigger: PEP', previousValue: 'Disabled', newValue: 'Enabled', ipAddress: '103.42.168.35' },
-  { id: 'ac15', timestamp: new Date(Date.now() - 604800000).toISOString(), user: 'Admin Taylor', userRole: 'Admin', settingChanged: 'Document Risk Threshold', previousValue: '60%', newValue: '50%', ipAddress: '103.42.168.10' },
-];
+const MOCK_AUDIT_ENTRIES: AuditChangeEntry[] = [];
 
 function AuditChangeLogTab() {
   const [userFilter, setUserFilter] = useState('all');

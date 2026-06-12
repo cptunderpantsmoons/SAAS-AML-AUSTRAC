@@ -22,44 +22,7 @@ interface SanctionsScreeningPanelProps {
 }
 
 // Screening source configuration
-const SCREENING_SOURCES = [
-  {
-    id: 'dfat',
-    name: 'DFAT Australia',
-    description: 'Dept. of Foreign Affairs & Trade',
-    icon: '🇦🇺',
-    lastUpdated: '2 hours ago',
-    status: 'active' as const,
-    totalEntries: 1847,
-  },
-  {
-    id: 'un',
-    name: 'UN Security Council',
-    description: 'Consolidated Sanctions List',
-    icon: '🇺🇳',
-    lastUpdated: '4 hours ago',
-    status: 'active' as const,
-    totalEntries: 892,
-  },
-  {
-    id: 'eu',
-    name: 'EU Sanctions',
-    description: 'EU Consolidated Financial Sanctions',
-    icon: '🇪🇺',
-    lastUpdated: '6 hours ago',
-    status: 'active' as const,
-    totalEntries: 2156,
-  },
-  {
-    id: 'ofac',
-    name: 'OFAC',
-    description: 'US Treasury SDN List',
-    icon: '🇺🇸',
-    lastUpdated: '1 hour ago',
-    status: 'active' as const,
-    totalEntries: 3241,
-  },
-];
+const SCREENING_SOURCES: Array<Record<string, unknown>> = [];
 
 type MatchType = 'Exact' | 'Partial' | 'Fuzzy';
 type ScreeningStatus = 'Pending Review' | 'Confirmed Match' | 'False Positive' | 'Cleared';
@@ -78,157 +41,8 @@ interface ScreeningMatch {
   screenedAt: string;
 }
 
-// Realistic Australian sample screening data
-function generateSampleData(clientNames: string[]): ScreeningMatch[] {
-  const matches: ScreeningMatch[] = [
-    {
-      id: 'SM-001',
-      clientName: 'Pacific Rim Holdings Pty Ltd',
-      clientId: 'CLT-001',
-      source: 'DFAT',
-      confidence: 94,
-      matchType: 'Exact',
-      status: 'Pending Review',
-      listedEntity: 'PACIFIC RIM HOLDINGS PTY LTD',
-      listedEntityId: 'DFAT-2024-0847',
-      program: 'Counter-Terrorism',
-      screenedAt: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: 'SM-002',
-      clientName: 'Zhao Wei Lin',
-      clientId: 'CLT-002',
-      source: 'OFAC',
-      confidence: 87,
-      matchType: 'Exact',
-      status: 'Confirmed Match',
-      listedEntity: 'ZHAO WEI LIN',
-      listedEntityId: 'OFAC-SDN-28491',
-      program: 'Weapons of Mass Destruction',
-      screenedAt: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      id: 'SM-003',
-      clientName: 'Meridian Financial Group',
-      clientId: 'CLT-003',
-      source: 'EU',
-      confidence: 72,
-      matchType: 'Partial',
-      status: 'Pending Review',
-      listedEntity: 'MERIDIAN FINANCIAL SERVICES GROUP',
-      listedEntityId: 'EU-2024-1247',
-      program: 'Financial Sanctions - Russia',
-      screenedAt: new Date(Date.now() - 14400000).toISOString(),
-    },
-    {
-      id: 'SM-004',
-      clientName: 'Ahmad Al-Rashid',
-      clientId: 'CLT-004',
-      source: 'UN',
-      confidence: 65,
-      matchType: 'Fuzzy',
-      status: 'Pending Review',
-      listedEntity: 'AHMAD AL-RASHIDI',
-      listedEntityId: 'UNSC-QE.A.138.05',
-      program: 'Al-Qaida Sanctions',
-      screenedAt: new Date(Date.now() - 18000000).toISOString(),
-    },
-    {
-      id: 'SM-005',
-      clientName: 'Southern Cross Ventures',
-      clientId: 'CLT-005',
-      source: 'DFAT',
-      confidence: 45,
-      matchType: 'Fuzzy',
-      status: 'False Positive',
-      listedEntity: 'SOUTHERN CROSS VENTURE CAPITAL',
-      listedEntityId: 'DFAT-2023-0412',
-      program: 'Counter-Proliferation',
-      screenedAt: new Date(Date.now() - 28800000).toISOString(),
-    },
-    {
-      id: 'SM-006',
-      clientName: 'Ivan Petrov Securities',
-      clientId: 'CLT-006',
-      source: 'EU',
-      confidence: 91,
-      matchType: 'Exact',
-      status: 'Confirmed Match',
-      listedEntity: 'IVAN PETROV SECURITIES LTD',
-      listedEntityId: 'EU-2024-0893',
-      program: 'Financial Sanctions - Russia/Belarus',
-      screenedAt: new Date(Date.now() - 43200000).toISOString(),
-    },
-    {
-      id: 'SM-007',
-      clientName: 'Tariq Mahmoud Associates',
-      clientId: 'CLT-007',
-      source: 'OFAC',
-      confidence: 58,
-      matchType: 'Partial',
-      status: 'Pending Review',
-      listedEntity: 'TARIQ MAHMOUD & ASSOCIATES',
-      listedEntityId: 'OFAC-SDN-19237',
-      program: 'Counter-Terrorism - ISIL/Daesh',
-      screenedAt: new Date(Date.now() - 50400000).toISOString(),
-    },
-    {
-      id: 'SM-008',
-      clientName: 'Gold Coast Property Holdings',
-      clientId: 'CLT-008',
-      source: 'DFAT',
-      confidence: 23,
-      matchType: 'Fuzzy',
-      status: 'Cleared',
-      listedEntity: 'GOLD COAST PROPERTIES HOLDINGS',
-      listedEntityId: 'DFAT-2024-0156',
-      program: 'Myanmar Sanctions',
-      screenedAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: 'SM-009',
-      clientName: 'Kiev Energy Resources Ltd',
-      clientId: 'CLT-009',
-      source: 'UN',
-      confidence: 82,
-      matchType: 'Partial',
-      status: 'Pending Review',
-      listedEntity: 'KIEV ENERGY RESOURCES LIMITED',
-      listedEntityId: 'UNSC-QE.A.289.14',
-      program: 'Energy Sector Sanctions',
-      screenedAt: new Date(Date.now() - 90000000).toISOString(),
-    },
-    {
-      id: 'SM-010',
-      clientName: 'Coral Sea Trading Co',
-      clientId: 'CLT-010',
-      source: 'OFAC',
-      confidence: 38,
-      matchType: 'Fuzzy',
-      status: 'Cleared',
-      listedEntity: 'CORAL SEA TRADING COMPANY',
-      listedEntityId: 'OFAC-SDN-31087',
-      program: 'Counter-Narcotics',
-      screenedAt: new Date(Date.now() - 129600000).toISOString(),
-    },
-  ];
-
-  // If we have real client names, splice them into some matches
-  if (clientNames.length > 0) {
-    const replacements = [
-      { matchIdx: 0, nameIdx: 0 },
-      { matchIdx: 2, nameIdx: Math.min(1, clientNames.length - 1) },
-      { matchIdx: 4, nameIdx: Math.min(2, clientNames.length - 1) },
-      { matchIdx: 7, nameIdx: Math.min(3, clientNames.length - 1) },
-    ];
-    for (const { matchIdx, nameIdx } of replacements) {
-      if (nameIdx < clientNames.length && matchIdx < matches.length) {
-        matches[matchIdx].clientName = clientNames[nameIdx];
-      }
-    }
-  }
-
-  return matches;
+function generateSampleData(_clientNames: string[]): ScreeningMatch[] {
+  return [];
 }
 
 function getConfidenceColor(confidence: number): string {
@@ -392,12 +206,12 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-foreground">Sanctions Screening</h2>
-                  <p className="text-xs text-muted-foreground">DFAT · UN · EU · OFAC Lists</p>
+                  <p className="text-xs text-muted-foreground">Configure sources in Settings</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
-                  4 SOURCES
+                <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/30">
+                  NO DATA
                 </Badge>
                 <Button
                   variant="ghost"
@@ -416,34 +230,44 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Screening Sources</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {SCREENING_SOURCES.map((source, idx) => (
-                      <motion.div
-                        key={source.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05, duration: 0.25 }}
-                      >
-                        <Card className="border border-border hover:shadow-sm transition-shadow">
-                          <CardContent className="p-3">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-base">{source.icon}</span>
-                              <span className="text-xs font-semibold truncate">{source.name}</span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mb-1.5">{source.description}</p>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-muted-foreground">
-                                <Clock className="h-2.5 w-2.5 inline mr-0.5" />
-                                {source.lastUpdated}
-                              </span>
-                              <Badge variant="outline" className="text-[8px] h-4 px-1 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
-                                LIVE
-                              </Badge>
-                            </div>
-                            <p className="text-[9px] text-muted-foreground mt-1">{source.totalEntries.toLocaleString()} entries</p>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
+                    {SCREENING_SOURCES.length === 0 ? (
+                      <div className="col-span-2 text-center py-6">
+                        <div className="h-12 w-12 rounded-xl bg-muted/30 mx-auto flex items-center justify-center mb-3">
+                          <Shield className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">No sanctions sources configured</p>
+                        <p className="text-xs text-muted-foreground mt-1">Add data sources in Settings to begin screening</p>
+                      </div>
+                    ) : (
+                      SCREENING_SOURCES.map((source, idx) => (
+                        <motion.div
+                          key={source.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.05, duration: 0.25 }}
+                        >
+                          <Card className="border border-border hover:shadow-sm transition-shadow">
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-base">{source.icon as string}</span>
+                                <span className="text-xs font-semibold truncate">{source.name as string}</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mb-1.5">{source.description as string}</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-muted-foreground">
+                                  <Clock className="h-2.5 w-2.5 inline mr-0.5" />
+                                  {source.lastUpdated as string}
+                                </span>
+                                <Badge variant="outline" className="text-[8px] h-4 px-1 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
+                                  LIVE
+                                </Badge>
+                              </div>
+                              <p className="text-[9px] text-muted-foreground mt-1">{(source.totalEntries as number).toLocaleString()} entries</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -743,8 +567,8 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
             <div className="border-t border-border px-4 py-3 bg-muted/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  All 4 sources active
+                  <div className="h-2 w-2 rounded-full bg-slate-400" />
+                  No sources configured
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1">

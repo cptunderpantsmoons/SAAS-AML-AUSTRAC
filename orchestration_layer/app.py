@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 from auth import get_auth_settings, init_supertokens, setup_supertokens_middleware
-from auth.dependencies import get_session
+from auth.dependencies import get_optional_session, get_session
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -425,7 +425,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(public_router)
     app.include_router(protected_router)
     from orchestration_layer.gateway import gateway_router
-    app.include_router(gateway_router, dependencies=[Depends(get_session)])
+    app.include_router(gateway_router, dependencies=[Depends(get_optional_session)])
     return app
 
 

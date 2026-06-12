@@ -29,7 +29,7 @@ interface ComplianceTask {
 }
 
 // Constants
-const ASSIGNEES = ['Sarah Chen', 'James Wilson', 'Emily Brown', 'Michael Taylor'];
+const ASSIGNEES: string[] = [];
 
 const CATEGORIES: Category[] = ['KYC Review', 'Sanctions', 'Report Filing', 'Audit', 'Training'];
 
@@ -125,109 +125,7 @@ function timeAgo(date: Date): string {
 
 // Generate initial sample data
 function createInitialTasks(): ComplianceTask[] {
-  const now = new Date();
-  return [
-    {
-      id: '1',
-      title: 'Review enhanced due diligence for Wei Chen',
-      description: 'Complete EDD review including source of funds verification and adverse media screening for high-risk client.',
-      priority: 'critical',
-      status: 'active',
-      dueDate: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-      assignee: 'Sarah Chen',
-      category: 'KYC Review',
-    },
-    {
-      id: '2',
-      title: 'File Q3 SMR reports to AUSTRAC',
-      description: 'Prepare and submit Suspicious Matter Reports for the quarter ending 30 September.',
-      priority: 'high',
-      status: 'active',
-      dueDate: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-      assignee: 'James Wilson',
-      category: 'Report Filing',
-    },
-    {
-      id: '3',
-      title: 'Complete annual AML/CTF training',
-      description: 'All staff must complete the mandatory annual anti-money laundering training module by end of month.',
-      priority: 'medium',
-      status: 'active',
-      dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
-      assignee: 'Emily Brown',
-      category: 'Training',
-    },
-    {
-      id: '4',
-      title: 'Update sanctions screening parameters',
-      description: 'Review and update automated sanctions screening thresholds per latest DFAT consolidated list.',
-      priority: 'high',
-      status: 'active',
-      dueDate: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
-      assignee: 'Michael Taylor',
-      category: 'Sanctions',
-    },
-    {
-      id: '5',
-      title: 'Review PEP status for Harbour City Properties',
-      description: 'Conduct PEP identification and assessment for newly identified politically exposed person associations.',
-      priority: 'critical',
-      status: 'active',
-      dueDate: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-      assignee: 'Sarah Chen',
-      category: 'KYC Review',
-    },
-    {
-      id: '6',
-      title: 'Prepare board compliance report',
-      description: 'Compile quarterly compliance report for board of directors including KPIs, incidents, and risk metrics.',
-      priority: 'medium',
-      status: 'completed',
-      dueDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
-      assignee: 'James Wilson',
-      category: 'Audit',
-    },
-    {
-      id: '7',
-      title: 'Re-verify identity documents for Pacific Trading',
-      description: 'Identity documents expired — schedule re-verification and update client records accordingly.',
-      priority: 'high',
-      status: 'active',
-      dueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-      assignee: 'Emily Brown',
-      category: 'KYC Review',
-    },
-    {
-      id: '8',
-      title: 'Annual risk assessment review',
-      description: 'Conduct comprehensive review of the AML/CTF risk assessment including business risk and jurisdictional risk.',
-      priority: 'medium',
-      status: 'active',
-      dueDate: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000),
-      assignee: 'Michael Taylor',
-      category: 'Audit',
-    },
-    {
-      id: '9',
-      title: 'Review transaction monitoring rules',
-      description: 'Evaluate effectiveness of existing monitoring rules and calibrate thresholds based on false positive rates.',
-      priority: 'low',
-      status: 'completed',
-      dueDate: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-      assignee: 'Sarah Chen',
-      category: 'Sanctions',
-    },
-    {
-      id: '10',
-      title: 'Submit TTR monthly report',
-      description: 'Compile and submit Threshold Transaction Reports for the previous month to AUSTRAC.',
-      priority: 'high',
-      status: 'overdue',
-      dueDate: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000),
-      assignee: 'James Wilson',
-      category: 'Report Filing',
-    },
-  ];
+  return [];
 }
 
 // Status filter type
@@ -245,7 +143,7 @@ export function ComplianceTaskManager() {
     priority: 'medium' as Priority,
     dueDate: '',
     category: 'KYC Review' as Category,
-    assignee: 'Sarah Chen',
+    assignee: '',
   });
 
   // Filter tasks
@@ -303,7 +201,7 @@ export function ComplianceTaskManager() {
       priority: 'medium',
       dueDate: '',
       category: 'KYC Review',
-      assignee: 'Sarah Chen',
+      assignee: '',
     });
     setShowAddForm(false);
   };
@@ -590,15 +488,10 @@ export function ComplianceTaskManager() {
 
                             {/* Assignee */}
                             <span className="text-[10px] flex items-center gap-1 text-muted-foreground ml-auto">
-                              <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8px] font-bold ${
-                                task.assignee === 'Sarah Chen' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
-                                task.assignee === 'James Wilson' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' :
-                                task.assignee === 'Emily Brown' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              }`}>
+                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[8px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                 {getInitials(task.assignee)}
                               </span>
-                              {task.assignee.split(' ')[0]}
+                              {task.assignee ? task.assignee.split(' ')[0] : 'Unassigned'}
                             </span>
                           </div>
                         </div>

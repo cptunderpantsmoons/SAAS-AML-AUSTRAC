@@ -246,8 +246,8 @@ function AppContent() {
           >
             <Shield className="h-4 w-4" />
             <span className="text-xs font-medium">Sanctions Check</span>
-            <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1 border-amber-300 dark:border-amber-700 text-amber-500 dark:text-amber-500">
-              4 LIST
+            <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-500">
+              OFF
             </Badge>
           </Button>
           <div className="flex items-center gap-2 px-3 py-2 mt-1 text-xs text-muted-foreground">
@@ -428,9 +428,9 @@ function AppContent() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
               <div className="flex items-center gap-3">
                 <span className="font-semibold text-foreground">AML/CTF Shield</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[9px] font-mono">v3.2.0</span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[9px] font-mono">v1.0.0</span>
                 <Separator orientation="vertical" className="h-3 hidden sm:block" />
-                <span className="hidden sm:inline">&copy; {new Date().getFullYear()} ComplianceGuard Pty Ltd</span>
+                <span className="hidden sm:inline">&copy; {new Date().getFullYear()} AML AUSTRAC</span>
               </div>
               <div className="flex items-center gap-2">
                 <Separator orientation="vertical" className="h-3 hidden sm:block" />
