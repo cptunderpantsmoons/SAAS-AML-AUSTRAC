@@ -8,7 +8,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://srv1603169.hstgr.cloud:8000
-      - NEXT_PUBLIC_SUPERTOKENS_CORE_URL=https://srv1603169.hstgr.cloud
+      - NEXT_PUBLIC_SUPERTOKENS_CORE_URL=http://srv1603169.hstgr.cloud:32849
       - NEXT_PUBLIC_APP_NAME=AML AUSTRAC
       - NEXT_PUBLIC_WEBSITE_DOMAIN=http://srv1603169.hstgr.cloud:3000
     networks:
@@ -21,7 +21,7 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
-      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_CONNECTION_URI=http://srv1603169.hstgr.cloud:32849
       - SUPERTOKENS_API_DOMAIN=http://srv1603169.hstgr.cloud:8000
       - SUPERTOKENS_WEBSITE_DOMAIN=http://srv1603169.hstgr.cloud:3000
       - CORS_ALLOWED_ORIGINS=http://srv1603169.hstgr.cloud:3000
@@ -65,7 +65,7 @@ services:
     image: ghcr.io/cptunderpantsmoons/aml-austrac-backend:latest
     environment:
       - PORT=8000
-      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_CONNECTION_URI=http://srv1603169.hstgr.cloud:32849
       - SUPERTOKENS_API_DOMAIN=http://srv1603169.hstgr.cloud:8000
       - SUPERTOKENS_WEBSITE_DOMAIN=http://srv1603169.hstgr.cloud:3000
     networks:
@@ -78,7 +78,7 @@ services:
     environment:
       - PORT=8006
       - GATEWAY_URL=http://api:8000
-      - SUPERTOKENS_CONNECTION_URI=https://srv1603169.hstgr.cloud
+      - SUPERTOKENS_CONNECTION_URI=http://srv1603169.hstgr.cloud:32849
       - SUPERTOKENS_API_DOMAIN=http://srv1603169.hstgr.cloud:8006
       - SUPERTOKENS_WEBSITE_DOMAIN=http://srv1603169.hstgr.cloud:3000
     networks:
