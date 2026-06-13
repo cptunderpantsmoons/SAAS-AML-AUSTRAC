@@ -173,12 +173,16 @@ function AppContent() {
         {/* Sidebar Header */}
         <div className="p-4 border-b border-border bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-950">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center">
+            <a
+              href="/landing.html"
+              className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition"
+              title="View marketing landing page"
+            >
               <Shield className="h-5 w-5 text-white" />
-            </div>
+            </a>
             <div>
-              <h1 className="font-bold text-sm text-white">AML/CTF Shield</h1>
-              <p className="text-[10px] text-slate-300">Compliance Platform</p>
+              <h1 className="font-bold text-sm text-white">Audit Intellect</h1>
+              <p className="text-[10px] text-slate-300">AML/CTF Compliance Platform</p>
             </div>
             <Button
               variant="ghost"

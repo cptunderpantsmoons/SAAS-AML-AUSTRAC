@@ -1,1 +1,343 @@
-<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n    <title>ComplyAml — AUSTRAC-Ready AML/CTF Compliance SaaS</title>\n    <meta name=\"description\" content=\"AI-powered AML/CTF compliance platform with document forgery detection, transaction monitoring, and AUSTRAC reporting. Built for Tranche 2 entities.\">\n    <!-- Tailwind CSS + Fonts -->\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n    <link href=\"https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap\" rel=\"stylesheet\">\n    <link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css\">\n    <style>\n        * { font-family: 'Inter', sans-serif; }\n        .gradient-bg {\n            background: radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.08), rgba(2, 84, 105, 0.02));\n        }\n        .glass-card {\n            background: rgba(255, 255, 255, 0.7);\n            backdrop-filter: blur(12px);\n            border: 1px solid rgba(255, 255, 255, 0.3);\n        }\n        .dark .glass-card {\n            background: rgba(15, 23, 42, 0.7);\n            border-color: rgba(255, 255, 255, 0.05);\n        }\n        .hover-lift {\n            transition: all 0.25s ease;\n        }\n        .hover-lift:hover {\n            transform: translateY(-4px);\n            box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.15);\n        }\n        .animated-gradient-border {\n            position: relative;\n            border-radius: 1rem;\n            background: linear-gradient(white, white) padding-box,\n                        linear-gradient(135deg, #14b8a6, #0ea5e9, #8b5cf6) border-box;\n            border: 1px solid transparent;\n        }\n        .dark .animated-gradient-border {\n            background: linear-gradient(#0f172a, #0f172a) padding-box,\n                        linear-gradient(135deg, #14b8a6, #0ea5e9, #8b5cf6) border-box;\n        }\n        @keyframes fadeInUp {\n            from { opacity: 0; transform: translateY(20px); }\n            to { opacity: 1; transform: translateY(0); }\n        }\n        .animate-fade-up {\n            animation: fadeInUp 0.6s ease-out forwards;\n        }\n        .delay-100 { animation-delay: 0.1s; }\n        .delay-200 { animation-delay: 0.2s; }\n        .delay-300 { animation-delay: 0.3s; }\n    </style>\n</head>\n<body class=\"bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300\">\n\n    <!-- Header / Navigation -->\n    <header class=\"sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800\">\n        <div class=\"max-w-7xl mx-auto px-6 sm:px-8 py-4 flex justify-between items-center\">\n            <div class=\"flex items-center gap-2\">\n                <div class=\"w-9 h-9 bg-gradient-to-br from-cyan-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg\">\n                    <i class=\"fas fa-shield-alt text-white text-lg\"></i>\n                </div>\n                <span class=\"font-bold text-xl tracking-tight\">Comply<span class=\"text-cyan-600\">Aml</span></span>\n                <span class=\"ml-2 text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full\">v4.0 · AUSTRAC ready</span>\n            </div>\n            <nav class=\"hidden md:flex gap-8 text-sm font-medium\">\n                <a href=\"#features\" class=\"hover:text-cyan-600 transition\">Features</a>\n                <a href=\"#security\" class=\"hover:text-cyan-600 transition\">Security</a>\n                <a href=\"#pricing\" class=\"hover:text-cyan-600 transition\">Pricing</a>\n                <a href=\"#contact\" class=\"hover:text-cyan-600 transition\">Contact</a>\n            </nav>\n            <div class=\"flex items-center gap-3\">\n                <button id=\"theme-toggle\" class=\"text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition\">\n                    <i class=\"fas fa-moon dark:hidden text-lg\"></i>\n                    <i class=\"fas fa-sun hidden dark:inline-block text-lg\"></i>\n                </button>\n                <a href=\"#demo\" class=\"hidden sm:inline-block bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition shadow-md\">Request demo</a>\n            </div>\n        </div>\n    </header>\n\n    <main>\n        <!-- Hero Section -->\n        <section class=\"gradient-bg py-20 md:py-28 overflow-hidden\">\n            <div class=\"max-w-7xl mx-auto px-6 sm:px-8 text-center md:text-left\">\n                <div class=\"grid md:grid-cols-2 gap-12 items-center\">\n                    <div class=\"space-y-6\">\n                        <div class=\"inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-4 py-1.5 rounded-full text-sm font-medium animate-fade-up\">\n                            <i class=\"fas fa-check-circle text-xs\"></i> <span>AUSTRAC compliance · Tranche 2 ready</span>\n                        </div>\n                        <h1 class=\"text-4xl md:text-6xl font-extrabold tracking-tight animate-fade-up delay-100\">\n                            Detect hidden forgery. <br>\n                            <span class=\"bg-gradient-to-r from-cyan-500 to-indigo-500 bg-clip-text text-transparent\">Automate AUSTRAC reporting.</span>\n                        </h1>\n                        <p class=\"text-lg text-slate-600 dark:text-slate-300 max-w-lg mx-auto md:mx-0 animate-fade-up delay-200\">\n                            The only AML/CTF platform with prompt injection & steganography detection. Built for Australian real estate, legal, accounting and financial services.\n                        </p>\n                        <div class=\"flex flex-wrap gap-4 justify-center md:justify-start animate-fade-up delay-300\">\n                            <a href=\"#demo\" class=\"bg-gradient-to-r from-cyan-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105\">Start free trial <i class=\"fas fa-arrow-right ml-2\"></i></a>\n                            <a href=\"#features\" class=\"border border-slate-300 dark:border-slate-700 px-6 py-3 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition\">Explore features</a>\n                        </div>\n                        <div class=\"flex items-center gap-6 justify-center md:justify-start pt-4 text-sm text-slate-500 dark:text-slate-400\">\n                            <span><i class=\"fas fa-lock text-emerald-500 mr-1\"></i> SOC 2 Type II</span>\n                            <span><i class=\"fas fa-database text-emerald-500 mr-1\"></i> AUSTRAC API</span>\n                            <span><i class=\"fas fa-robot text-emerald-500 mr-1\"></i> AI Compliance Assistant</span>\n                        </div>\n                    </div>\n                    <div class=\"relative hidden md:block\">\n                        <div class=\"bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 rotate-1 hover:rotate-0 transition duration-500\">\n                            <img src=\"https://placehold.co/600x400/0f172a/38bdf8?text=Dashboard+Preview\" alt=\"Dashboard preview\" class=\"rounded-xl w-full\">\n                            <div class=\"absolute -bottom-3 -right-3 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full\">Live demo</div>\n                        </div>\n                    </div>\n                </div>\n            </div>\n        </section>\n\n        <!-- Trusted by badges -->\n        <div class=\"border-y border-slate-200 dark:border-slate-800 py-4 bg-slate-50/50 dark:bg-slate-900/30\">\n            <div class=\"max-w-7xl mx-auto px-6 text-center\">\n                <p class=\"text-xs uppercase tracking-wider text-slate-500 mb-3\">Trusted by compliance leaders across Australia</p>\n                <div class=\"flex flex-wrap justify-center gap-8 opacity-70 grayscale\">\n                    <i class=\"fab fa-airbnb text-2xl\"></i> <span class=\"font-mono text-sm\">Law Council AU</span>\n                    <span class=\"font-bold text-sm\">REIA</span>\n                    <span class=\"font-mono text-sm\">CA ANZ</span>\n                    <i class=\"fab fa-microsoft text-xl\"></i>\n                </div>\n            </div>\n        </div>\n\n        <!-- Features Section -->\n        <section id=\"features\" class=\"py-20\">\n            <div class=\"max-w-7xl mx-auto px-6 sm:px-8\">\n                <div class=\"text-center max-w-2xl mx-auto mb-14\">\n                    <h2 class=\"text-3xl md:text-4xl font-bold\">Everything you need to stay compliant</h2>\n                    <p class=\"text-slate-600 dark:text-slate-300 mt-4\">From document forgery detection to AUSTRAC filing — all in one platform.</p>\n                </div>\n                <div class=\"grid md:grid-cols-3 gap-8\">\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-file-alt text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">Forgery & injection detection</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">Proprietary engine catches prompt injection, white-space steganography, and document tampering others miss.</p>\n                    </div>\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-chart-line text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">Transaction monitoring</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">Rule-based alerts, structuring detection, and AI risk scoring — continuous OCDD ready.</p>\n                    </div>\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-file-export text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">AUSTRAC reporting</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">SMR, TTR, IFTI‑E generation with XML preview and one-click submission to AUSTRAC API.</p>\n                    </div>\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-robot text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">AI Compliance Assistant</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">LLM-powered chat for regulatory questions, SMR narrative drafting, and risk guidance.</p>\n                    </div>\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-users text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">Sanctions screening</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">Real-time checks against DFAT, UN, EU, and OFAC lists. PEP + adverse media included.</p>\n                    </div>\n                    <div class=\"glass-card rounded-2xl p-6 hover-lift\">\n                        <div class=\"w-12 h-12 bg-gradient-to-br from-slate-600 to-slate-800 rounded-xl flex items-center justify-center mb-4\"><i class=\"fas fa-chart-simple text-white text-xl\"></i></div>\n                        <h3 class=\"text-xl font-bold\">Governance & audit</h3>\n                        <p class=\"text-slate-600 dark:text-slate-300 mt-2 text-sm\">Immutable audit trail, risk appetite dashboard, case management, and compliance task manager.</p>\n                    </div>\n                </div>\n            </div>\n        </section>\n\n        <!-- Differentiator: Document Engine deep dive -->\n        <section class=\"bg-slate-50 dark:bg-slate-900/40 py-20\">\n            <div class=\"max-w-7xl mx-auto px-6 sm:px-8\">\n                <div class=\"grid md:grid-cols-2 gap-12 items-center\">\n                    <div>\n                        <span class=\"text-cyan-600 font-semibold text-sm uppercase tracking-wide\">Built different</span>\n                        <h2 class=\"text-3xl font-bold mt-2\">The only AML engine that detects hidden adversarial attacks</h2>\n                        <p class=\"mt-4 text-slate-600 dark:text-slate-300\">Our proprietary document analysis pipeline catches what traditional KYC providers ignore: prompt injection buried in PDFs, steganographic payloads in images, and sophisticated forgeries that bypass standard OCR checks.</p>\n                        <ul class=\"mt-6 space-y-3\">\n                            <li class=\"flex gap-2\"><i class=\"fas fa-check-circle text-emerald-500 mt-1\"></i><span>Prompt injection detection in metadata & content</span></li>\n                            <li class=\"flex gap-2\"><i class=\"fas fa-check-circle text-emerald-500 mt-1\"></i><span>White-space & zero-width character steganography</span></li>\n                            <li class=\"flex gap-2\"><i class=\"fas fa-check-circle text-emerald-500 mt-1\"></i><span>Document sanitisation pipeline for LLM safety</span></li>\n                            <li class=\"flex gap-2\"><i class=\"fas fa-check-circle text-emerald-500 mt-1\"></i><span>Real-time forgery scoring (0-1 confidence)</span></li>\n                        </ul>\n                        <div class=\"mt-8 flex gap-3\">\n                            <span class=\"bg-white dark:bg-slate-800 rounded-full px-4 py-1 text-sm shadow-sm\"><i class=\"fas fa-file-pdf text-red-500 mr-1\"></i> PDF/Images/Office</span>\n                            <span class=\"bg-white dark:bg-slate-800 rounded-full px-4 py-1 text-sm shadow-sm\"><i class=\"fas fa-chart-line mr-1\"></i> 99.2% detection rate</span>\n                        </div>\n                    </div>\n                    <div class=\"relative\">\n                        <div class=\"bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 rounded-2xl p-1\">\n                            <div class=\"bg-white dark:bg-slate-950 rounded-xl p-5 shadow-xl\">\n                                <pre class=\"text-xs font-mono overflow-x-auto\"><span class=\"text-red-500\">[ALERT]</span> prompt_injection_detected: true\n<span class=\"text-yellow-500\">stego_confidence</span>: 0.94\n<span class=\"text-emerald-500\">sanitized_document</span>: clean\n<span class=\"text-slate-500\">// hidden payload removed</span></pre>\n                                <div class=\"h-px bg-slate-200 my-4\"></div>\n                                <div class=\"flex items-center gap-3\"><i class=\"fas fa-shield-haltered text-cyan-600\"></i><span class=\"text-sm\">Blocked 12,000+ adversarial documents in beta</span></div>\n                            </div>\n                        </div>\n                    </div>\n                </div>\n            </div>\n        </section>\n\n        <!-- How It Works -->\n        <section class=\"py-20\">\n            <div class=\"max-w-7xl mx-auto px-6 text-center\">\n                <h2 class=\"text-3xl font-bold\">Go live in days, not months</h2>\n                <p class=\"text-slate-600 dark:text-slate-300 mt-2 mb-12\">Designed for Tranche 2 entities with minimal IT overhead.</p>\n                <div class=\"grid md:grid-cols-4 gap-6\">\n                    <div><div class=\"bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600\">1</div><h4 class=\"font-semibold mt-3\">Connect sources</h4><p class=\"text-sm text-slate-500\">API or CSV import clients & transactions</p></div>\n                    <div><div class=\"bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600\">2</div><h4 class=\"font-semibold mt-3\">Configure rules</h4><p class=\"text-sm text-slate-500\">Set risk appetite & monitoring thresholds</p></div>\n                    <div><div class=\"bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600\">3</div><h4 class=\"font-semibold mt-3\">Auto‑screen</h4><p class=\"text-sm text-slate-500\">Real‑time forgery & sanctions checks</p></div>\n                    <div><div class=\"bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600\">4</div><h4 class=\"font-semibold mt-3\">Submit reports</h4><p class=\"text-sm text-slate-500\">One‑click AUSTRAC filings</p></div>\n                </div>\n            </div>\n        </section>\n\n        <!-- Security & Compliance Badges -->\n        <section id=\"security\" class=\"py-16 border-y border-slate-200 dark:border-slate-800\">\n            <div class=\"max-w-7xl mx-auto px-6 text-center\">\n                <h3 class=\"text-2xl font-bold\">Enterprise-grade security & compliance</h3>\n                <div class=\"flex flex-wrap justify-center gap-6 mt-8\">\n                    <div class=\"flex flex-col items-center\"><i class=\"fab fa-aws text-3xl text-slate-500\"></i><span class=\"text-xs mt-1\">AWS AU region</span></div>\n                    <div class=\"flex flex-col items-center\"><i class=\"fas fa-lock text-3xl text-slate-500\"></i><span class=\"text-xs mt-1\">AES-256 at rest</span></div>\n                    <div class=\"flex flex-col items-center\"><i class=\"fas fa-shield-haltered text-3xl text-slate-500\"></i><span class=\"text-xs mt-1\">ISO 27001 ready</span></div>\n                    <div class=\"flex flex-col items-center\"><i class=\"fas fa-clipboard-list text-3xl text-slate-500\"></i><span class=\"text-xs mt-1\">Audit log 7y retention</span></div>\n                </div>\n            </div>\n        </section>\n\n        <!-- Pricing (simple) -->\n        <section id=\"pricing\" class=\"py-20\">\n            <div class=\"max-w-7xl mx-auto px-6 text-center\">\n                <h2 class=\"text-3xl font-bold\">Simple, transparent pricing</h2>\n                <p class=\"mt-2 mb-10\">No hidden fees. Cancel anytime.</p>\n                <div class=\"grid md:grid-cols-3 gap-8 max-w-4xl mx-auto\">\n                    <div class=\"border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-left hover-lift\">\n                        <h3 class=\"font-bold text-xl\">Essentials</h3>\n                        <p class=\"text-slate-500 text-sm mt-1\">For small firms & sole practitioners</p>\n                        <div class=\"mt-4\"><span class=\"text-3xl font-bold\">$249</span><span class=\"text-slate-500\">/month</span></div>\n                        <ul class=\"mt-6 space-y-2 text-sm\">\n                            <li><i class=\"fas fa-check text-emerald-500 w-5\"></i> Up to 500 clients</li>\n                            <li><i class=\"fas fa-check text-emerald-500 w-5\"></i> Document forgery detection</li>\n                            <li><i class=\"fas fa-check text-emerald-500 w-5\"></i> AUSTRAC SMR/TTR</li>\n                            <li><i class=\"fas fa-check text-emerald-500 w-5\"></i> Email support</li>\n                        </ul>\n                        <a href=\"#demo\" class=\"block text-center mt-6 border border-slate-300 dark:border-slate-700 rounded-lg py-2 hover:bg-slate-50 dark:hover:bg-slate-800\">Get started</a>\n                    </div>\n                    <div class=\"border-2 border-cyan-500 rounded-2xl p-6 text-left hover-lift shadow-xl relative\">\n                        <div class=\"absolute -top-3 left-6 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded-full\">Most popular</div>\n                        <h3 class=\"font-bold text-xl\">Professional</h3>\n                        <p class=\"text-slate-500 text-sm mt-1\">For growing compliance teams</p>\n                        <div class=\"mt-4\"><span class=\"text-3xl font-bold\">$599</span><span class=\"text-slate-500\">/month</span></div>\n                        <ul class=\"mt-6 space-y-2 text-sm\">\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> Unlimited clients</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> AI Assistant + API access</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> Sanctions & PEP screening</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> Priority support & onboarding</li>\n                        </ul>\n                        <a href=\"#demo\" class=\"block text-center mt-6 bg-gradient-to-r from-cyan-600 to-indigo-600 text-white rounded-lg py-2\">Start free trial</a>\n                    </div>\n                    <div class=\"border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-left hover-lift\">\n                        <h3 class=\"font-bold text-xl\">Enterprise</h3>\n                        <p class=\"text-slate-500 text-sm mt-1\">Custom deployments & SLAs</p>\n                        <div class=\"mt-4\"><span class=\"text-3xl font-bold\">Custom</span></div>\n                        <ul class=\"mt-6 space-y-2 text-sm\">\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> On‑prem / VPC</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> Dedicated compliance advisor</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> SSO/SAML</li>\n                            <li><i class=\"fas fa-check text-emerald-500\"></i> 99.99% SLA</li>\n                        </ul>\n                        <a href=\"#contact\" class=\"block text-center mt-6 border border-slate-300 dark:border-slate-700 rounded-lg py-2\">Contact sales</a>\n                    </div>\n                </div>\n            </div>\n        </section>\n\n        <!-- Demo / Contact form -->\n        <section id=\"demo\" class=\"py-20 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950\">\n            <div class=\"max-w-4xl mx-auto px-6\">\n                <div class=\"glass-card rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-800\">\n                    <h2 class=\"text-2xl font-bold text-center\">Request a demo</h2>\n                    <p class=\"text-center text-slate-600 dark:text-slate-300 mb-8\">See how ComplyAml detects hidden document forgery and automates AUSTRAC reporting.</p>\n                    <form id=\"demo-form\" class=\"grid md:grid-cols-2 gap-5\">\n                        <input type=\"text\" placeholder=\"Full name\" class=\"border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900\" required>\n                        <input type=\"email\" placeholder=\"Work email\" class=\"border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900\" required>\n                        <input type=\"text\" placeholder=\"Company / Firm\" class=\"border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900\">\n                        <select class=\"border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900\">\n                            <option>Legal practice</option><option>Real estate agency</option><option>Accounting firm</option><option>Financial services</option><option>Other</option>\n                        </select>\n                        <div class=\"md:col-span-2\">\n                            <textarea rows=\"2\" placeholder=\"Tell us about your compliance needs...\" class=\"w-full border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2\"></textarea>\n                        </div>\n                        <div class=\"md:col-span-2\">\n                            <button type=\"submit\" class=\"w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-2 rounded-lg font-semibold hover:scale-[1.01] transition\">Schedule live demo →</button>\n                        </div>\n                    </form>\n                    <p class=\"text-center text-xs text-slate-500 mt-6\">No spam. We'll respond within 24h.</p>\n                </div>\n            </div>\n        </section>\n    </main>\n\n    <!-- Footer -->\n    <footer class=\"border-t border-slate-200 dark:border-slate-800 py-12 bg-white dark:bg-slate-950\">\n        <div class=\"max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-8 text-sm\">\n            <div><div class=\"flex items-center gap-2\"><i class=\"fas fa-shield-alt text-cyan-600\"></i><span class=\"font-bold\">ComplyAml</span></div><p class=\"text-slate-500 mt-2\">AUSTRAC-registered compliance SaaS for Australian businesses.</p></div>\n            <div><h4 class=\"font-semibold\">Product</h4><ul class=\"mt-2 space-y-1 text-slate-500\"><li><a href=\"#features\" class=\"hover:text-cyan-600\">Features</a></li><li><a href=\"#pricing\">Pricing</a></li><li><a href=\"#\">API docs</a></li></ul></div>\n            <div><h4 class=\"font-semibold\">Company</h4><ul class=\"mt-2 space-y-1 text-slate-500\"><li><a href=\"#\">About</a></li><li><a href=\"#\">Careers</a></li><li><a href=\"#\">Blog</a></li></ul></div>\n            <div><h4 class=\"font-semibold\">Legal</h4><ul class=\"mt-2 space-y-1 text-slate-500\"><li><a href=\"#\">Privacy</a></li><li><a href=\"#\">Terms</a></li><li><a href=\"#\">AUSTRAC notice</a></li></ul></div>\n        </div>\n        <div class=\"text-center text-xs text-slate-500 pt-10 border-t border-slate-200 dark:border-slate-800 mt-8\">© 2026 ComplyAml. All rights reserved. ABN 12 345 678 910</div>\n    </footer>\n\n    <script>\n        // Dark mode toggle\n        const themeToggle = document.getElementById('theme-toggle');\n        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {\n            document.documentElement.classList.add('dark');\n        } else {\n            document.documentElement.classList.remove('dark');\n        }\n        themeToggle?.addEventListener('click', () => {\n            document.documentElement.classList.toggle('dark');\n            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';\n        });\n\n        // Simple form handler (demo)\n        const form = document.getElementById('demo-form');\n        form?.addEventListener('submit', (e) => {\n            e.preventDefault();\n            alert('Thank you! Our team will contact you shortly to schedule a demo.');\n            form.reset();\n        });\n    </script>\n</body>\n</html>"}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Audit Intellect — AUSTRAC-Ready AML/CTF Compliance SaaS</title>
+    <meta name="description" content="AI-powered AML/CTF compliance platform with document forgery detection, transaction monitoring, and AUSTRAC reporting. Built for Tranche 2 entities.">
+    <!-- Tailwind CSS + Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.08), rgba(2, 84, 105, 0.02));
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass-card {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+        .hover-lift {
+            transition: all 0.25s ease;
+        }
+        .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.15);
+        }
+        .animated-gradient-border {
+            position: relative;
+            border-radius: 1rem;
+            background: linear-gradient(white, white) padding-box,
+                        linear-gradient(135deg, #14b8a6, #0ea5e9, #8b5cf6) border-box;
+            border: 1px solid transparent;
+        }
+        .dark .animated-gradient-border {
+            background: linear-gradient(#0f172a, #0f172a) padding-box,
+                        linear-gradient(135deg, #14b8a6, #0ea5e9, #8b5cf6) border-box;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+    </style>
+</head>
+<body class="bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+
+    <!-- Header / Navigation -->
+    <header class="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-6 sm:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 bg-gradient-to-br from-cyan-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-shield-alt text-white text-lg"></i>
+                </div>
+                <span class="font-bold text-xl tracking-tight">Audit<span class="text-cyan-600"> Intellect</span></span>
+                <span class="ml-2 text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">v4.0 · AUSTRAC ready</span>
+            </div>
+            <nav class="hidden md:flex gap-8 text-sm font-medium">
+                <a href="#features" class="hover:text-cyan-600 transition">Features</a>
+                <a href="#security" class="hover:text-cyan-600 transition">Security</a>
+                <a href="#pricing" class="hover:text-cyan-600 transition">Pricing</a>
+                <a href="#contact" class="hover:text-cyan-600 transition">Contact</a>
+            </nav>
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" class="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+                    <i class="fas fa-moon dark:hidden text-lg"></i>
+                    <i class="fas fa-sun hidden dark:inline-block text-lg"></i>
+                </button>
+                <a href="/auth" class="hidden sm:inline-block bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:scale-105 transition shadow-md">Sign in</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="gradient-bg py-20 md:py-28 overflow-hidden">
+            <div class="max-w-7xl mx-auto px-6 sm:px-8 text-center md:text-left">
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-6">
+                        <div class="inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-4 py-1.5 rounded-full text-sm font-medium animate-fade-up">
+                            <i class="fas fa-check-circle text-xs"></i> <span>AUSTRAC compliance · Tranche 2 ready</span>
+                        </div>
+                        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight animate-fade-up delay-100">
+                            Detect hidden forgery. <br>
+                            <span class="bg-gradient-to-r from-cyan-500 to-indigo-500 bg-clip-text text-transparent">Automate AUSTRAC reporting.</span>
+                        </h1>
+                        <p class="text-lg text-slate-600 dark:text-slate-300 max-w-lg mx-auto md:mx-0 animate-fade-up delay-200">
+                            The only AML/CTF platform with prompt injection & steganography detection. Built for Australian real estate, legal, accounting and financial services.
+                        </p>
+                        <div class="flex flex-wrap gap-4 justify-center md:justify-start animate-fade-up delay-300">
+                            <a href="/auth" class="bg-gradient-to-r from-cyan-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105">Start free trial <i class="fas fa-arrow-right ml-2"></i></a>
+                            <a href="#features" class="border border-slate-300 dark:border-slate-700 px-6 py-3 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition">Explore features</a>
+                        </div>
+                        <div class="flex items-center gap-6 justify-center md:justify-start pt-4 text-sm text-slate-500 dark:text-slate-400">
+                            <span><i class="fas fa-lock text-emerald-500 mr-1"></i> SOC 2 Type II</span>
+                            <span><i class="fas fa-database text-emerald-500 mr-1"></i> AUSTRAC API</span>
+                            <span><i class="fas fa-robot text-emerald-500 mr-1"></i> AI Compliance Assistant</span>
+                        </div>
+                    </div>
+                    <div class="relative hidden md:block">
+                        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 rotate-1 hover:rotate-0 transition duration-500">
+                            <img src="https://placehold.co/600x400/0f172a/38bdf8?text=Dashboard+Preview" alt="Dashboard preview" class="rounded-xl w-full">
+                            <div class="absolute -bottom-3 -right-3 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">Live demo</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trusted by badges -->
+        <div class="border-y border-slate-200 dark:border-slate-800 py-4 bg-slate-50/50 dark:bg-slate-900/30">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Trusted by compliance leaders across Australia</p>
+                <div class="flex flex-wrap justify-center gap-8 opacity-70 grayscale">
+                    <i class="fab fa-airbnb text-2xl"></i> <span class="font-mono text-sm">Law Council AU</span>
+                    <span class="font-bold text-sm">REIA</span>
+                    <span class="font-mono text-sm">CA ANZ</span>
+                    <i class="fab fa-microsoft text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <section id="features" class="py-20">
+            <div class="max-w-7xl mx-auto px-6 sm:px-8">
+                <div class="text-center max-w-2xl mx-auto mb-14">
+                    <h2 class="text-3xl md:text-4xl font-bold">Everything you need to stay compliant</h2>
+                    <p class="text-slate-600 dark:text-slate-300 mt-4">From document forgery detection to AUSTRAC filing — all in one platform.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-file-alt text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">Forgery & injection detection</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">Proprietary engine catches prompt injection, white-space steganography, and document tampering others miss.</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-chart-line text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">Transaction monitoring</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">Rule-based alerts, structuring detection, and AI risk scoring — continuous OCDD ready.</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-file-export text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">AUSTRAC reporting</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">SMR, TTR, IFTI‑E generation with XML preview and one-click submission to AUSTRAC API.</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-robot text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">AI Compliance Assistant</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">LLM-powered chat for regulatory questions, SMR narrative drafting, and risk guidance.</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-users text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">Sanctions screening</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">Real-time checks against DFAT, UN, EU, and OFAC lists. PEP + adverse media included.</p>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 hover-lift">
+                        <div class="w-12 h-12 bg-gradient-to-br from-slate-600 to-slate-800 rounded-xl flex items-center justify-center mb-4"><i class="fas fa-chart-simple text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">Governance & audit</h3>
+                        <p class="text-slate-600 dark:text-slate-300 mt-2 text-sm">Immutable audit trail, risk appetite dashboard, case management, and compliance task manager.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Differentiator: Document Engine deep dive -->
+        <section class="bg-slate-50 dark:bg-slate-900/40 py-20">
+            <div class="max-w-7xl mx-auto px-6 sm:px-8">
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <span class="text-cyan-600 font-semibold text-sm uppercase tracking-wide">Built different</span>
+                        <h2 class="text-3xl font-bold mt-2">The only AML engine that detects hidden adversarial attacks</h2>
+                        <p class="mt-4 text-slate-600 dark:text-slate-300">Our proprietary document analysis pipeline catches what traditional KYC providers ignore: prompt injection buried in PDFs, steganographic payloads in images, and sophisticated forgeries that bypass standard OCR checks.</p>
+                        <ul class="mt-6 space-y-3">
+                            <li class="flex gap-2"><i class="fas fa-check-circle text-emerald-500 mt-1"></i><span>Prompt injection detection in metadata & content</span></li>
+                            <li class="flex gap-2"><i class="fas fa-check-circle text-emerald-500 mt-1"></i><span>White-space & zero-width character steganography</span></li>
+                            <li class="flex gap-2"><i class="fas fa-check-circle text-emerald-500 mt-1"></i><span>Document sanitisation pipeline for LLM safety</span></li>
+                            <li class="flex gap-2"><i class="fas fa-check-circle text-emerald-500 mt-1"></i><span>Real-time forgery scoring (0-1 confidence)</span></li>
+                        </ul>
+                        <div class="mt-8 flex gap-3">
+                            <span class="bg-white dark:bg-slate-800 rounded-full px-4 py-1 text-sm shadow-sm"><i class="fas fa-file-pdf text-red-500 mr-1"></i> PDF/Images/Office</span>
+                            <span class="bg-white dark:bg-slate-800 rounded-full px-4 py-1 text-sm shadow-sm"><i class="fas fa-chart-line mr-1"></i> 99.2% detection rate</span>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <div class="bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 rounded-2xl p-1">
+                            <div class="bg-white dark:bg-slate-950 rounded-xl p-5 shadow-xl">
+                                <pre class="text-xs font-mono overflow-x-auto"><span class="text-red-500">[ALERT]</span> prompt_injection_detected: true
+<span class="text-yellow-500">stego_confidence</span>: 0.94
+<span class="text-emerald-500">sanitized_document</span>: clean
+<span class="text-slate-500">// hidden payload removed</span></pre>
+                                <div class="h-px bg-slate-200 my-4"></div>
+                                <div class="flex items-center gap-3"><i class="fas fa-shield-haltered text-cyan-600"></i><span class="text-sm">Blocked 12,000+ adversarial documents in beta</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section class="py-20">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <h2 class="text-3xl font-bold">Go live in days, not months</h2>
+                <p class="text-slate-600 dark:text-slate-300 mt-2 mb-12">Designed for Tranche 2 entities with minimal IT overhead.</p>
+                <div class="grid md:grid-cols-4 gap-6">
+                    <div><div class="bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600">1</div><h4 class="font-semibold mt-3">Connect sources</h4><p class="text-sm text-slate-500">API or CSV import clients & transactions</p></div>
+                    <div><div class="bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600">2</div><h4 class="font-semibold mt-3">Configure rules</h4><p class="text-sm text-slate-500">Set risk appetite & monitoring thresholds</p></div>
+                    <div><div class="bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600">3</div><h4 class="font-semibold mt-3">Auto‑screen</h4><p class="text-sm text-slate-500">Real‑time forgery & sanctions checks</p></div>
+                    <div><div class="bg-slate-100 dark:bg-slate-800 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-bold text-cyan-600">4</div><h4 class="font-semibold mt-3">Submit reports</h4><p class="text-sm text-slate-500">One‑click AUSTRAC filings</p></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security & Compliance Badges -->
+        <section id="security" class="py-16 border-y border-slate-200 dark:border-slate-800">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <h3 class="text-2xl font-bold">Enterprise-grade security & compliance</h3>
+                <div class="flex flex-wrap justify-center gap-6 mt-8">
+                    <div class="flex flex-col items-center"><i class="fab fa-aws text-3xl text-slate-500"></i><span class="text-xs mt-1">AWS AU region</span></div>
+                    <div class="flex flex-col items-center"><i class="fas fa-lock text-3xl text-slate-500"></i><span class="text-xs mt-1">AES-256 at rest</span></div>
+                    <div class="flex flex-col items-center"><i class="fas fa-shield-haltered text-3xl text-slate-500"></i><span class="text-xs mt-1">ISO 27001 ready</span></div>
+                    <div class="flex flex-col items-center"><i class="fas fa-clipboard-list text-3xl text-slate-500"></i><span class="text-xs mt-1">Audit log 7y retention</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing (simple) -->
+        <section id="pricing" class="py-20">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <h2 class="text-3xl font-bold">Simple, transparent pricing</h2>
+                <p class="mt-2 mb-10">No hidden fees. Cancel anytime.</p>
+                <div class="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                    <div class="border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-left hover-lift">
+                        <h3 class="font-bold text-xl">Essentials</h3>
+                        <p class="text-slate-500 text-sm mt-1">For small firms & sole practitioners</p>
+                        <div class="mt-4"><span class="text-3xl font-bold">$249</span><span class="text-slate-500">/month</span></div>
+                        <ul class="mt-6 space-y-2 text-sm">
+                            <li><i class="fas fa-check text-emerald-500 w-5"></i> Up to 500 clients</li>
+                            <li><i class="fas fa-check text-emerald-500 w-5"></i> Document forgery detection</li>
+                            <li><i class="fas fa-check text-emerald-500 w-5"></i> AUSTRAC SMR/TTR</li>
+                            <li><i class="fas fa-check text-emerald-500 w-5"></i> Email support</li>
+                        </ul>
+                        <a href="/auth" class="block text-center mt-6 border border-slate-300 dark:border-slate-700 rounded-lg py-2 hover:bg-slate-50 dark:hover:bg-slate-800">Get started</a>
+                    </div>
+                    <div class="border-2 border-cyan-500 rounded-2xl p-6 text-left hover-lift shadow-xl relative">
+                        <div class="absolute -top-3 left-6 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded-full">Most popular</div>
+                        <h3 class="font-bold text-xl">Professional</h3>
+                        <p class="text-slate-500 text-sm mt-1">For growing compliance teams</p>
+                        <div class="mt-4"><span class="text-3xl font-bold">$599</span><span class="text-slate-500">/month</span></div>
+                        <ul class="mt-6 space-y-2 text-sm">
+                            <li><i class="fas fa-check text-emerald-500"></i> Unlimited clients</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> AI Assistant + API access</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> Sanctions & PEP screening</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> Priority support & onboarding</li>
+                        </ul>
+                        <a href="/auth" class="block text-center mt-6 bg-gradient-to-r from-cyan-600 to-indigo-600 text-white rounded-lg py-2">Start free trial</a>
+                    </div>
+                    <div class="border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-left hover-lift">
+                        <h3 class="font-bold text-xl">Enterprise</h3>
+                        <p class="text-slate-500 text-sm mt-1">Custom deployments & SLAs</p>
+                        <div class="mt-4"><span class="text-3xl font-bold">Custom</span></div>
+                        <ul class="mt-6 space-y-2 text-sm">
+                            <li><i class="fas fa-check text-emerald-500"></i> On‑prem / VPC</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> Dedicated compliance advisor</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> SSO/SAML</li>
+                            <li><i class="fas fa-check text-emerald-500"></i> 99.99% SLA</li>
+                        </ul>
+                        <a href="#contact" class="block text-center mt-6 border border-slate-300 dark:border-slate-700 rounded-lg py-2">Contact sales</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demo / Contact form -->
+        <section id="demo" class="py-20 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
+            <div class="max-w-4xl mx-auto px-6">
+                <div class="glass-card rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-800">
+                    <h2 class="text-2xl font-bold text-center">Request a demo</h2>
+                    <p class="text-center text-slate-600 dark:text-slate-300 mb-8">See how Audit Intellect detects hidden document forgery and automates AUSTRAC reporting.</p>
+                    <form id="demo-form" class="grid md:grid-cols-2 gap-5">
+                        <input type="text" placeholder="Full name" class="border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900" required>
+                        <input type="email" placeholder="Work email" class="border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900" required>
+                        <input type="text" placeholder="Company / Firm" class="border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900">
+                        <select class="border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-white dark:bg-slate-900">
+                            <option>Legal practice</option><option>Real estate agency</option><option>Accounting firm</option><option>Financial services</option><option>Other</option>
+                        </select>
+                        <div class="md:col-span-2">
+                            <textarea rows="2" placeholder="Tell us about your compliance needs..." class="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2"></textarea>
+                        </div>
+                        <div class="md:col-span-2">
+                            <button type="submit" class="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-2 rounded-lg font-semibold hover:scale-[1.01] transition">Schedule live demo →</button>
+                        </div>
+                    </form>
+                    <p class="text-center text-xs text-slate-500 mt-6">No spam. We'll respond within 24h.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200 dark:border-slate-800 py-12 bg-white dark:bg-slate-950">
+        <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-8 text-sm">
+            <div><div class="flex items-center gap-2"><i class="fas fa-shield-alt text-cyan-600"></i><span class="font-bold">Audit Intellect</span></div><p class="text-slate-500 mt-2">AUSTRAC-registered compliance SaaS for Australian businesses.</p></div>
+            <div><h4 class="font-semibold">Product</h4><ul class="mt-2 space-y-1 text-slate-500"><li><a href="#features" class="hover:text-cyan-600">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="/api/docs">API docs</a></li></ul></div>
+            <div><h4 class="font-semibold">Company</h4><ul class="mt-2 space-y-1 text-slate-500"><li><a href="#">About</a></li><li><a href="#">Careers</a></li><li><a href="#">Blog</a></li></ul></div>
+            <div><h4 class="font-semibold">Legal</h4><ul class="mt-2 space-y-1 text-slate-500"><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li><li><a href="#">AUSTRAC notice</a></li></ul></div>
+        </div>
+        <div class="text-center text-xs text-slate-500 pt-10 border-t border-slate-200 dark:border-slate-800 mt-8">© 2026 Audit Intellect. All rights reserved. ABN 12 345 678 910</div>
+    </footer>
+
+    <script>
+        // Dark mode toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        themeToggle?.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        });
+
+        // Simple form handler (demo)
+        const form = document.getElementById('demo-form');
+        form?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Thank you! Our team will contact you shortly to schedule a demo.');
+            form.reset();
+        });
+    </script>
+</body>
+</html>
