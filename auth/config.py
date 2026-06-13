@@ -9,12 +9,15 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Final
 
 logger = logging.getLogger("auth.config")
 
-DEFAULT_SUPERTOKENS_CORE: Final = "https://srv1603169.hstgr.cloud"
-DEFAULT_API_BASE_PATH: Final = "/auth"
+# NOTE: There is intentionally no default ``SUPERTOKENS_CONNECTION_URI``.  If
+# the environment variable is not set, the AuthSettings constructor raises a
+# clear ``RuntimeError`` so a misconfigured deployment cannot silently
+# authenticate against a third-party host.  Tests that need a value can set
+# ``SUPERTOKENS_CONNECTION_URI`` in ``monkeypatch.setenv``.
+DEFAULT_API_BASE_PATH: str = "/auth"
 
 
 @dataclass(slots=True)
@@ -23,7 +26,7 @@ class AuthSettings:
 
     # ── SuperTokens Core ──────────────────────────────────────────────
     connection_uri: str = field(
-        default_factory=lambda: os.getenv("SUPERTOKENS_CONNECTION_URI", DEFAULT_SUPERTOKENS_CORE)
+        default_factory=lambda: _required_env("SUPERTOKENS_CONNECTION_URI")
     )
     api_key: str = field(
         default_factory=lambda: os.getenv("SUPERTOKENS_API_KEY", "")
@@ -45,8 +48,12 @@ class AuthSettings:
     )
 
     # ── Session ───────────────────────────────────────────────────────
+    # ``cookie_secure`` defaults to ``True`` so that production deployments
+    # do not silently send session cookies in cleartext.  Set the
+    # ``SUPERTOKENS_COOKIE_SECURE=false`` environment variable explicitly
+    # for local development over plain HTTP.
     cookie_secure: bool = field(
-        default_factory=lambda: os.getenv("SUPERTOKENS_COOKIE_SECURE", "false").lower() == "true"
+        default_factory=lambda: os.getenv("SUPERTOKENS_COOKIE_SECURE", "true").lower() != "false"
     )
     cookie_same_site: str = field(
         default_factory=lambda: os.getenv("SUPERTOKENS_COOKIE_SAME_SITE", "lax")
@@ -74,7 +81,19 @@ class AuthSettings:
     )
 
     def __post_init__(self) -> None:
-        pass
+        if not self.connection_uri:
+            raise RuntimeError(
+                "SUPERTOKENS_CONNECTION_URI environment variable is required. "
+                "Set it to your SuperTokens core URI (e.g. https://supertokens.example.com)."
+            )
+
+
+def _required_env(name: str) -> str:
+    """Return the value of ``name`` from the environment, or empty string if
+    unset.  ``AuthSettings.__post_init__`` validates the result so a missing
+    variable produces a clear ``RuntimeError`` at instantiation time.
+    """
+    return os.getenv(name, "")
 
 
 def get_auth_settings() -> AuthSettings:

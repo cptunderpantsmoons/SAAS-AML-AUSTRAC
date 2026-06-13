@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from auth.config import AuthSettings, get_auth_settings
-from auth.dependencies import get_session
+from auth.dependencies import get_session, require_compliance_officer
 from fastapi.testclient import TestClient
 from orchestration_layer.app import create_app
 
@@ -19,8 +19,13 @@ def _mock_auth(app: Any) -> None:
         mock.get_access_token_payload.return_value = {"st-role": {"v": ["compliance_officer"]}}
         return mock
 
+    async def _mock_role() -> Any:
+        # ``/seed`` is now role-gated; supply a fake session object.
+        return MagicMock()
+
     app.dependency_overrides[get_session] = _mock_session
     app.dependency_overrides[get_auth_settings] = lambda: AuthSettings(enable_middleware=False)
+    app.dependency_overrides[require_compliance_officer] = _mock_role
 
 
 @pytest.fixture

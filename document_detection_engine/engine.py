@@ -24,12 +24,18 @@ def _apply_threshold(result: dict[str, Any], threshold: float) -> dict[str, Any]
     return normalized
 
 
+# Compute the average confidence of detectors that *fired* (not the running
+# sum divided by the total number of detectors).  This matches the documented
+# "average confidence of active modules" behaviour — a single high-confidence
+# hit is treated as high risk; a half-confidence hit from a single detector
+# is medium risk.
 def _derive_risk_score(modules: dict[str, dict[str, Any]]) -> tuple[float, str]:
     active = [result for result in modules.values() if result["detected"]]
     if not active:
         return 0.0, "low"
 
-    risk_score = min(100.0, sum(result["confidence"] for result in active) / len(modules) * 100)
+    avg_confidence = sum(result["confidence"] for result in active) / len(active)
+    risk_score = min(100.0, avg_confidence * 100)
     if risk_score >= 90:
         risk_level = "critical"
     elif risk_score >= 70:

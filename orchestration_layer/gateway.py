@@ -17,7 +17,8 @@ import os
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from auth.dependencies import require_compliance_officer
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 gateway_router = APIRouter()
@@ -38,9 +39,15 @@ async def _proxy_request(
     base_url: str,
     path: str,
     request: Request,
-    allowed_statuses: tuple[int, ...] = (200, 201),
+    allowed_statuses: tuple[int, ...] = (200, 201, 202, 204),
 ) -> JSONResponse:
-    """Forward an incoming request to a downstream service and return its JSON response."""
+    """Forward an incoming request to a downstream service and return its JSON response.
+
+    For methods that carry a body (``POST``/``PUT``/``PATCH``/``DELETE``)
+    the raw body is forwarded verbatim.  ``DELETE`` is treated as body-
+    capable so the gateway can relay typed DELETE requests; downstream
+    services that do not read the body simply ignore it.
+    """
     client = httpx.AsyncClient()
     try:
         url = f"{base_url}{path}"
@@ -49,7 +56,7 @@ async def _proxy_request(
             if key.lower() in ("authorization", "content-type"):
                 headers[key] = value
 
-        if method.upper() in ("POST", "PUT", "PATCH"):
+        if method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
             body = await request.body()
             resp = await client.request(method, url, headers=headers, content=body, timeout=30.0)
         else:
@@ -59,6 +66,9 @@ async def _proxy_request(
         if resp.status_code not in allowed_statuses:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
+        # 204 No Content / empty body: return an empty JSON object.
+        if resp.status_code == 204 or not resp.content:
+            return JSONResponse(content={}, status_code=resp.status_code)
         return JSONResponse(content=resp.json(), status_code=resp.status_code)
     except HTTPException:
         raise
@@ -140,6 +150,124 @@ async def draft_narrative(request: Request) -> JSONResponse:
 @gateway_router.post("/reports/{report_id}/transmit")
 async def transmit_report(report_id: str, request: Request) -> JSONResponse:
     return await _proxy_request("POST", _REPORTING, f"/reports/{report_id}/transmit", request)
+
+
+# ── Case Management ───────────────────────────────────────────────────────
+
+
+@gateway_router.get("/cases")
+async def list_cases(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/cases", request)
+
+
+@gateway_router.post("/cases", dependencies=[Depends(require_compliance_officer)])
+async def create_case(request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, "/cases", request)
+
+
+@gateway_router.get("/cases/{case_id}")
+async def get_case(case_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, f"/cases/{case_id}", request)
+
+
+@gateway_router.patch("/cases/{case_id}", dependencies=[Depends(require_compliance_officer)])
+async def update_case(case_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("PATCH", _GOVERNANCE, f"/cases/{case_id}", request)
+
+
+@gateway_router.post("/cases/{case_id}/notes", dependencies=[Depends(require_compliance_officer)])
+async def add_case_note(case_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, f"/cases/{case_id}/notes", request)
+
+
+@gateway_router.delete("/cases/{case_id}", dependencies=[Depends(require_compliance_officer)])
+async def delete_case(case_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("DELETE", _GOVERNANCE, f"/cases/{case_id}", request)
+
+
+# ── Compliance Tasks ──────────────────────────────────────────────────────
+
+
+@gateway_router.get("/tasks")
+async def list_tasks(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/tasks", request)
+
+
+@gateway_router.post("/tasks", dependencies=[Depends(require_compliance_officer)])
+async def create_task(request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, "/tasks", request)
+
+
+@gateway_router.get("/tasks/{task_id}")
+async def get_task(task_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, f"/tasks/{task_id}", request)
+
+
+@gateway_router.patch("/tasks/{task_id}", dependencies=[Depends(require_compliance_officer)])
+async def update_task(task_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("PATCH", _GOVERNANCE, f"/tasks/{task_id}", request)
+
+
+@gateway_router.delete("/tasks/{task_id}", dependencies=[Depends(require_compliance_officer)])
+async def delete_task(task_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("DELETE", _GOVERNANCE, f"/tasks/{task_id}", request)
+
+
+# ── Audit Changes (user-facing change log) ──────────────────────────────────
+
+
+@gateway_router.get("/audit-changes")
+async def list_audit_changes(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/audit-changes", request)
+
+
+@gateway_router.post("/audit-changes", dependencies=[Depends(require_compliance_officer)])
+async def record_audit_change(request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, "/audit-changes", request)
+
+
+# ── Integration Provider Status ────────────────────────────────────────────
+
+
+@gateway_router.get("/providers")
+async def list_providers(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/providers", request)
+
+
+@gateway_router.post("/providers", dependencies=[Depends(require_compliance_officer)])
+async def update_provider(request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, "/providers", request)
+
+
+# ── Service Health ─────────────────────────────────────────────────────────
+
+
+@gateway_router.get("/services/status")
+async def list_service_health(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/services/status", request)
+
+
+# ── Sanctions Screening ────────────────────────────────────────────────────
+
+
+@gateway_router.get("/sanctions/sources")
+async def list_sanctions_sources(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/sanctions/sources", request)
+
+
+@gateway_router.get("/sanctions/matches")
+async def list_sanctions_matches(request: Request) -> JSONResponse:
+    return await _proxy_request("GET", _GOVERNANCE, "/sanctions/matches", request)
+
+
+@gateway_router.post("/sanctions/screen", dependencies=[Depends(require_compliance_officer)])
+async def screen_name(request: Request) -> JSONResponse:
+    return await _proxy_request("POST", _GOVERNANCE, "/sanctions/screen", request)
+
+
+@gateway_router.patch("/sanctions/matches/{match_id}", dependencies=[Depends(require_compliance_officer)])
+async def update_sanctions_match(match_id: str, request: Request) -> JSONResponse:
+    return await _proxy_request("PATCH", _GOVERNANCE, f"/sanctions/matches/{match_id}", request)
 
 
 # ── Governance ──────────────────────────────────────────────────────────────
@@ -330,7 +458,7 @@ async def global_search(request: Request, q: str = "") -> JSONResponse:
     return JSONResponse({"results": results})
 
 
-@gateway_router.post("/seed")
+@gateway_router.post("/seed", dependencies=[Depends(require_compliance_officer)])
 async def seed_data(request: Request) -> JSONResponse:
     """Seed all in-memory stores with sample data."""
     from ubo_graph.db_client import Neo4jClient

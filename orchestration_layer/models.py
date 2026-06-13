@@ -90,6 +90,11 @@ class SanctionsScreeningResult(BaseModel):
 class KYBLookupResult(BaseModel):
     provider: str
     status: KYBStatus
+    # The graph key in the UBO Neo4j store (e.g. ``co-abc12345``) that
+    # corresponds to this entity.  Populated by the KYB adapter when it
+    # resolves the registered business; the orchestration layer uses it
+    # to call the UBO graph service.
+    entity_id: str = ""
     entity_name: str = ""
     registration_id: str = ""
     jurisdiction: str = ""

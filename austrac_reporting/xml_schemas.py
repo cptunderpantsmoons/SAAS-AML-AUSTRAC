@@ -30,7 +30,12 @@ class XSDValidator:
 
         xsd_file = XSD_DIR / f"{report_type.value}.xsd"
         if not xsd_file.exists():
-            raise FileNotFoundError(f"XSD schema not found: {xsd_file}")
+            # Wrap the OS-level FileNotFoundError in a ValueError so callers
+            # can treat "no schema for this report type" as a domain error
+            # rather than having to catch OSError/FileNotFoundError.
+            raise ValueError(f"XSD schema not found for report type: {report_type.value}") from FileNotFoundError(
+                xsd_file
+            )
 
         with open(xsd_file, "rb") as f:
             schema_doc = etree.parse(f)

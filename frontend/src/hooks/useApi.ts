@@ -384,3 +384,676 @@ export function useReportsList(params?: { status?: string; reportType?: string; 
     }>(`/reports?${searchParams.toString()}`),
   });
 }
+
+// ── Case Management ────────────────────────────────────────────────────────────
+
+/** Helpers to translate between the backend's snake_case payloads and the
+ *  camelCase shape used throughout the UI.  Pydantic emits `assigned_to`,
+ *  `linked_alerts`, etc.; React code uses `assignedTo`, `linkedAlerts`, …
+ */
+type AmlCaseRow = {
+  id: string;
+  case_id: string;
+  title: string;
+  description?: string;
+  type: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'open' | 'in_progress' | 'escalated' | 'closed';
+  assigned_to: string;
+  client_id?: string;
+  client_name: string;
+  linked_alerts: string[];
+  linked_documents: string[];
+  linked_evidence?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    description?: string;
+    date: string;
+  }>;
+  notes: Array<{ id: string; author: string; content: string; timestamp: string }>;
+  status_timeline: Array<{ status: string; timestamp: string; actor: string; note?: string }>;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+};
+
+function toAmlCase(row: AmlCaseRow): AmlCase {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    title: row.title,
+    description: row.description ?? '',
+    type: row.type,
+    priority: row.priority,
+    status: row.status,
+    assignedTo: row.assigned_to,
+    clientId: row.client_id ?? '',
+    clientName: row.client_name,
+    linkedAlerts: row.linked_alerts ?? [],
+    linkedDocuments: row.linked_documents ?? [],
+    linkedEvidence: row.linked_evidence ?? [],
+    notes: row.notes ?? [],
+    statusTimeline: row.status_timeline ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    closedAt: row.closed_at,
+  };
+}
+
+export interface CaseNote {
+  id: string;
+  author: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface StatusChange {
+  status: string;
+  timestamp: string;
+  actor: string;
+  note?: string;
+}
+
+export interface LinkedEvidence {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  date: string;
+}
+
+export interface AmlCase {
+  id: string;
+  caseId: string;
+  title: string;
+  description?: string;
+  type: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'open' | 'in_progress' | 'escalated' | 'closed';
+  assignedTo: string;
+  clientId?: string;
+  clientName: string;
+  linkedAlerts: string[];
+  linkedDocuments: string[];
+  linkedEvidence?: LinkedEvidence[];
+  notes: CaseNote[];
+  statusTimeline: StatusChange[];
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+}
+
+export interface CaseListResponse {
+  cases: AmlCase[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  assignees: string[];
+}
+
+export interface CreateCasePayload {
+  title: string;
+  description?: string;
+  type: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  client_id?: string;
+  client_name: string;
+  assigned_to?: string;
+  linked_alerts?: string[];
+  linked_documents?: string[];
+}
+
+export interface UpdateCasePayload {
+  title?: string;
+  description?: string;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+  status?: 'open' | 'in_progress' | 'escalated' | 'closed';
+  assigned_to?: string;
+  linked_alerts?: string[];
+  linked_documents?: string[];
+  note?: string;
+}
+
+export function useCases(params?: {
+  status?: string;
+  priority?: string;
+  caseType?: string;
+  assignedTo?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.priority) searchParams.set('priority', params.priority);
+  if (params?.caseType) searchParams.set('caseType', params.caseType);
+  if (params?.assignedTo) searchParams.set('assignedTo', params.assignedTo);
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
+
+  return useQuery({
+    queryKey: ['cases', params],
+    queryFn: async () => {
+      const raw = await apiFetch<{
+        cases: AmlCaseRow[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+        assignees: string[];
+      }>(`/cases?${searchParams.toString()}`);
+      return {
+        cases: raw.cases.map(toAmlCase),
+        pagination: raw.pagination,
+        assignees: raw.assignees,
+      };
+    },
+  });
+}
+
+export function useCreateCase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateCasePayload) => {
+      const raw = await apiFetch<AmlCaseRow>('/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return toAmlCase(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cases'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); },
+  });
+}
+
+export function useUpdateCase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCasePayload }) => {
+      const raw = await apiFetch<AmlCaseRow>(`/cases/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return toAmlCase(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cases'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+export function useDeleteCase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/cases/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cases'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+export function useAddCaseNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, author, content }: { id: string; author: string; content: string }) => {
+      const raw = await apiFetch<AmlCaseRow>(`/cases/${id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author, content }),
+      });
+      return toAmlCase(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cases'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+// ── Compliance Tasks ──────────────────────────────────────────────────────────
+
+type ComplianceTaskRow = {
+  id: string;
+  title: string;
+  description?: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'active' | 'completed';
+  due_date: string;
+  assignee: string;
+  category: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function toComplianceTask(row: ComplianceTaskRow): ComplianceTask {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    priority: row.priority,
+    status: row.status,
+    dueDate: row.due_date,
+    assignee: row.assignee,
+    category: row.category,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export interface ComplianceTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'active' | 'completed';
+  dueDate: string;
+  assignee: string;
+  category: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskListResponse {
+  tasks: ComplianceTask[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  assignees: string[];
+}
+
+export interface CreateTaskPayload {
+  title: string;
+  description?: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  due_date: string;
+  category: string;
+  assignee?: string;
+}
+
+export interface UpdateTaskPayload {
+  title?: string;
+  description?: string;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+  status?: 'active' | 'completed';
+  due_date?: string;
+  assignee?: string;
+  category?: string;
+}
+
+export function useTasks(params?: {
+  status?: string;
+  priority?: string;
+  category?: string;
+  assignee?: string;
+  overdueOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.priority) searchParams.set('priority', params.priority);
+  if (params?.category) searchParams.set('category', params.category);
+  if (params?.assignee) searchParams.set('assignee', params.assignee);
+  if (params?.overdueOnly) searchParams.set('overdue_only', 'true');
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
+
+  return useQuery({
+    queryKey: ['tasks', params],
+    queryFn: async () => {
+      const raw = await apiFetch<{
+        tasks: ComplianceTaskRow[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+        assignees: string[];
+      }>(`/tasks?${searchParams.toString()}`);
+      return {
+        tasks: raw.tasks.map(toComplianceTask),
+        pagination: raw.pagination,
+        assignees: raw.assignees,
+      };
+    },
+  });
+}
+
+export function useCreateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateTaskPayload) => {
+      const raw = await apiFetch<ComplianceTaskRow>('/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return toComplianceTask(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+export function useUpdateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTaskPayload }) => {
+      const raw = await apiFetch<ComplianceTaskRow>(`/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return toComplianceTask(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+export function useDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/tasks/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); qc.invalidateQueries({ queryKey: ['audit-changes'] }); },
+  });
+}
+
+// ── Audit Changes (Settings → Audit tab) ─────────────────────────────────────
+
+type AuditChangeRow = {
+  id: string;
+  user: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  changes: Record<string, unknown>;
+  timestamp: string;
+};
+
+function toAuditChange(row: AuditChangeRow): AuditChangeEntry {
+  return {
+    id: row.id,
+    user: row.user,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    changes: row.changes,
+    timestamp: row.timestamp,
+  };
+}
+
+export interface AuditChangeEntry {
+  id: string;
+  user: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  changes: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface AuditChangeListResponse {
+  entries: AuditChangeEntry[];
+  users: string[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export function useAuditChanges(params?: {
+  user?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.user) searchParams.set('user', params.user);
+  if (params?.action) searchParams.set('action', params.action);
+  if (params?.entityType) searchParams.set('entity_type', params.entityType);
+  if (params?.entityId) searchParams.set('entity_id', params.entityId);
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
+
+  return useQuery({
+    queryKey: ['audit-changes', params],
+    queryFn: async () => {
+      const raw = await apiFetch<{
+        entries: AuditChangeRow[];
+        users: string[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>(`/audit-changes?${searchParams.toString()}`);
+      return {
+        entries: raw.entries.map(toAuditChange),
+        users: raw.users,
+        pagination: raw.pagination,
+      };
+    },
+  });
+}
+
+// ── Integration Providers (Settings → API Integration) ────────────────────────
+
+type ProviderStatusRow = {
+  name: string;
+  status: string;
+  last_sync: string | null;
+  description: string;
+  healthy: boolean;
+};
+
+function toProviderStatus(row: ProviderStatusRow): ProviderStatus {
+  return {
+    name: row.name,
+    status: row.status as ProviderStatus['status'],
+    lastSync: row.last_sync,
+    description: row.description,
+    healthy: row.healthy,
+  };
+}
+
+export interface ProviderStatus {
+  name: string;
+  status: 'connected' | 'disconnected' | 'degraded';
+  lastSync: string | null;
+  description: string;
+  healthy: boolean;
+}
+
+export function useProviders() {
+  return useQuery({
+    queryKey: ['providers'],
+    queryFn: async () => {
+      const raw = await apiFetch<ProviderStatusRow[]>('/providers');
+      return raw.map(toProviderStatus);
+    },
+  });
+}
+
+export function useUpdateProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string; status: string; description?: string }) => {
+      const raw = await apiFetch<ProviderStatusRow>('/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return toProviderStatus(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['providers'] }); },
+  });
+}
+
+// ── Service Health (Settings → System Health) ────────────────────────────────
+
+type ServiceStatusRow = {
+  name: string;
+  status: string;
+  uptime_pct: number;
+  response_time_ms: number;
+  last_incident: string;
+  response_history: number[];
+  healthy: boolean;
+  checked_at: string;
+};
+
+function toServiceStatus(row: ServiceStatusRow): ServiceStatus {
+  return {
+    name: row.name,
+    status: row.status as ServiceStatus['status'],
+    uptimePct: row.uptime_pct,
+    responseTimeMs: row.response_time_ms,
+    lastIncident: row.last_incident,
+    responseHistory: row.response_history,
+    healthy: row.healthy,
+    checkedAt: row.checked_at,
+  };
+}
+
+export interface ServiceStatus {
+  name: string;
+  status: 'operational' | 'degraded' | 'down';
+  uptimePct: number;
+  responseTimeMs: number;
+  lastIncident: string;
+  responseHistory: number[];
+  healthy: boolean;
+  checkedAt: string;
+}
+
+export function useServiceHealth() {
+  return useQuery({
+    queryKey: ['services', 'status'],
+    queryFn: async () => {
+      const raw = await apiFetch<ServiceStatusRow[]>('/services/status');
+      return raw.map(toServiceStatus);
+    },
+    refetchInterval: 30000,
+  });
+}
+
+// ── Sanctions Screening (ScreeningPanel) ────────────────────────────────────
+
+type SanctionsSourceRow = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  last_check: string | null;
+  entries_indexed: number;
+  healthy: boolean;
+};
+
+type SanctionsMatchRow = {
+  id: string;
+  client_id: string;
+  client_name: string;
+  source: string;
+  confidence: number;
+  match_type: 'Exact' | 'Partial' | 'Fuzzy';
+  status: 'Pending Review' | 'Confirmed Match' | 'False Positive' | 'Cleared';
+  listed_entity: string;
+  listed_entity_id: string;
+  program: string;
+  screened_at: string;
+};
+
+function toSanctionsSource(row: SanctionsSourceRow): SanctionsSource {
+  return {
+    id: row.id,
+    name: row.name,
+    enabled: row.enabled,
+    lastCheck: row.last_check,
+    entriesIndexed: row.entries_indexed,
+    healthy: row.healthy,
+  };
+}
+
+function toSanctionsMatch(row: SanctionsMatchRow): SanctionsMatch {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    source: row.source,
+    confidence: row.confidence,
+    matchType: row.match_type,
+    status: row.status,
+    listedEntity: row.listed_entity,
+    listedEntityId: row.listed_entity_id,
+    program: row.program,
+    screenedAt: row.screened_at,
+  };
+}
+
+export interface SanctionsSource {
+  id: string;
+  name: string;
+  enabled: boolean;
+  lastCheck: string | null;
+  entriesIndexed: number;
+  healthy: boolean;
+}
+
+export interface SanctionsMatch {
+  id: string;
+  clientId: string;
+  clientName: string;
+  source: string;
+  confidence: number;
+  matchType: 'Exact' | 'Partial' | 'Fuzzy';
+  status: 'Pending Review' | 'Confirmed Match' | 'False Positive' | 'Cleared';
+  listedEntity: string;
+  listedEntityId: string;
+  program: string;
+  screenedAt: string;
+}
+
+export function useSanctionsSources() {
+  return useQuery({
+    queryKey: ['sanctions', 'sources'],
+    queryFn: async () => {
+      const raw = await apiFetch<SanctionsSourceRow[]>('/sanctions/sources');
+      return raw.map(toSanctionsSource);
+    },
+  });
+}
+
+export function useSanctionsMatches(params?: { status?: string; clientId?: string; source?: string; page?: number; pageSize?: number }) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.clientId) searchParams.set('client_id', params.clientId);
+  if (params?.source) searchParams.set('source', params.source);
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.pageSize) searchParams.set('page_size', String(params.pageSize));
+
+  return useQuery({
+    queryKey: ['sanctions', 'matches', params],
+    queryFn: async () => {
+      const raw = await apiFetch<{
+        matches: SanctionsMatchRow[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>(`/sanctions/matches?${searchParams.toString()}`);
+      return {
+        matches: raw.matches.map(toSanctionsMatch),
+        pagination: raw.pagination,
+      };
+    },
+  });
+}
+
+export function useScreenName() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { query: string; clientId?: string; clientName?: string }) => {
+      const raw = await apiFetch<SanctionsMatchRow[]>('/sanctions/screen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return raw.map(toSanctionsMatch);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sanctions', 'matches'] }); },
+  });
+}
+
+export function useUpdateSanctionsMatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const raw = await apiFetch<SanctionsMatchRow>(`/sanctions/matches/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      return toSanctionsMatch(raw);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sanctions', 'matches'] }); },
+  });
+}
+

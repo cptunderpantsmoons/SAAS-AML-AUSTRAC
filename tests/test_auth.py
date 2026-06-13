@@ -9,12 +9,14 @@ from fastapi import HTTPException
 
 
 class TestAuthSettings:
-    def test_default_values(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_values_require_connection_uri(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("SUPERTOKENS_CONNECTION_URI", raising=False)
         monkeypatch.delenv("SUPERTOKENS_API_KEY", raising=False)
-        settings = AuthSettings()
-        assert settings.connection_uri == "https://srv1603169.hstgr.cloud"
-        assert settings.api_key == ""
+        # No default for SUPERTOKENS_CONNECTION_URI — it must be set explicitly.
+        with pytest.raises(RuntimeError, match="SUPERTOKENS_CONNECTION_URI"):
+            AuthSettings()
 
     def test_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SUPERTOKENS_CONNECTION_URI", "https://core.example.com")
@@ -29,9 +31,28 @@ class TestAuthSettings:
         self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ) -> None:
         monkeypatch.delenv("SUPERTOKENS_API_KEY", raising=False)
+        monkeypatch.setenv("SUPERTOKENS_CONNECTION_URI", "https://core.example.com")
         settings = AuthSettings()
         assert settings.api_key == ""
         # API key is now optional — no warning expected
+
+    def test_cookie_secure_defaults_to_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("SUPERTOKENS_COOKIE_SECURE", raising=False)
+        monkeypatch.setenv("SUPERTOKENS_CONNECTION_URI", "https://core.example.com")
+        settings = AuthSettings()
+        # ``cookie_secure`` defaults to True so a misconfigured production
+        # deployment does not silently send session cookies in cleartext.
+        assert settings.cookie_secure is True
+
+    def test_cookie_secure_can_be_disabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SUPERTOKENS_COOKIE_SECURE", "false")
+        monkeypatch.setenv("SUPERTOKENS_CONNECTION_URI", "https://core.example.com")
+        settings = AuthSettings()
+        assert settings.cookie_secure is False
 
 
 class TestGetSession:
@@ -78,6 +99,10 @@ class TestGetOptionalSession:
 
 
 class TestRequireRole:
+    @pytest.fixture(autouse=True)
+    def _auth_settings_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("SUPERTOKENS_CONNECTION_URI", "https://core.example.com")
+
     @pytest.mark.asyncio
     async def test_allows_matching_role(self) -> None:
         mock_session = MagicMock()

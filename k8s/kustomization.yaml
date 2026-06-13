@@ -3,6 +3,20 @@ kind: Kustomization
 
 namespace: aml-platform
 
+# Each ServiceAccount references an IRSA role-arn that is produced by
+# Terraform.  The ``REPLACE_WITH_TERRAFORM_OUTPUT_...`` placeholders MUST
+# be substituted before ``kubectl apply`` -- otherwise the pod will fail
+# to assume the role at runtime (the AWS API returns ``InvalidIdentityToken``
+# for unknown role-arns) and the pod will crash-loop with no logs.
+#
+# Recommended workflow:
+#   1. ``terraform output -json > tf.json``
+#   2. ``envsubst < kustomization.yaml | kubectl apply -f -``
+#   3.  or use ``kustomize edit set`` / ArgoCD ``replacements``.
+#
+# The full list of placeholders to substitute is in
+# ``kustomize-config.yaml``.
+
 resources:
   - base/namespace.yaml
   - base/configmap.yaml
@@ -15,3 +29,6 @@ resources:
   - austrac_reporting/
   - governance/
   - compliance_agent/
+
+configurations:
+  - kustomize-config.yaml

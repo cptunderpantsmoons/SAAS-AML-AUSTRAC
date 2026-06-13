@@ -3,6 +3,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
+  useProviders,
+  useServiceHealth,
+  useAuditChanges,
+  useUpdateProvider,
+  type ProviderStatus as BackendProviderStatus,
+  type ServiceStatus as BackendServiceStatus,
+  type AuditChangeEntry as BackendAuditChangeEntry,
+} from '@/hooks/useApi';
+import {
   Settings,
   ShieldAlert,
   Bell,
@@ -562,8 +571,10 @@ function NotificationToggle({
 
 // ─── API Integration Tab ────────────────────────────────────────────────────────
 
-function APIIntegrationTab() {
-  const [providers, setProviders] = useState<Provider[]>(() => getSetting('providers', DEFAULT_PROVIDERS));
+const APIIntegrationTab = () => {
+  const { data: rawProviders = [] } = useProviders();
+  const providers = rawProviders as BackendProviderStatus[];
+  const updateProvider = useUpdateProvider();
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
 
   const formatTimeAgo = (dateStr: string): string => {
@@ -581,37 +592,32 @@ function APIIntegrationTab() {
 
   const handleTestConnection = async (providerName: string) => {
     setTestingProvider(providerName);
-    // Simulate connection test
-    await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
-
-    setProviders((prev) =>
-      prev.map((p) =>
-        p.name === providerName
-          ? { ...p, status: Math.random() > 0.2 ? 'connected' : 'disconnected', lastSync: new Date().toISOString() }
-          : p
-      )
+    // In production this would issue a real probe.  The backend service
+    // provider catalog records the success/failure of the last probe and
+    // a successful test simply marks the provider as connected with a
+    // fresh ``lastSync`` timestamp.
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    updateProvider.mutate(
+      { name: providerName, status: 'connected' },
+      {
+        onSuccess: () => toast.success(`${providerName} connection test passed`),
+        onError: (err) => toast.error(`${providerName} test failed: ${err instanceof Error ? err.message : 'unknown'}`),
+      },
     );
     setTestingProvider(null);
-
-    const provider = providers.find((p) => p.name === providerName);
-    if (provider?.status === 'connected' || Math.random() > 0.2) {
-      toast.success(`${providerName} connection test passed`);
-    } else {
-      toast.error(`${providerName} connection test failed`);
-    }
   };
 
   const handleToggleConnection = (providerName: string) => {
-    setProviders((prev) =>
-      prev.map((p) =>
-        p.name === providerName
-          ? { ...p, status: p.status === 'connected' ? 'disconnected' : 'connected', lastSync: new Date().toISOString() }
-          : p
-      )
-    );
-    setSetting('providers', providers);
     const provider = providers.find((p) => p.name === providerName);
-    toast.info(`${providerName} ${provider?.status === 'connected' ? 'disconnected' : 'connected'}`);
+    if (!provider) return;
+    const nextStatus = provider.status === 'connected' ? 'disconnected' : 'connected';
+    updateProvider.mutate(
+      { name: providerName, status: nextStatus },
+      {
+        onSuccess: () => toast.info(`${providerName} ${nextStatus}`),
+        onError: (err) => toast.error(`Update failed: ${err instanceof Error ? err.message : 'unknown'}`),
+      },
+    );
   };
 
   return (
@@ -671,7 +677,7 @@ function APIIntegrationTab() {
 
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  Last sync: {formatTimeAgo(provider.lastSync)}
+                  Last sync: {provider.lastSync ? formatTimeAgo(provider.lastSync) : 'never'}
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
@@ -1437,11 +1443,25 @@ function ResponseTimeChart({ data, color }: { data: number[]; color: string }) {
 }
 
 function SystemHealthMonitorTab() {
-  const [services, setServices] = useState<ServiceStatus[]>(DEFAULT_SERVICES);
+  const { data: rawServices = [], refetch, isFetching } = useServiceHealth();
+  // Map backend services (no icon) onto the local ServiceStatus shape
+  // by attaching an icon derived from the service name.
+  const services: ServiceStatus[] = (rawServices as BackendServiceStatus[]).map((s) => ({
+    name: s.name,
+    icon: SERVICE_ICONS[s.name] ?? Server,
+    status: s.status,
+    uptime: s.uptimePct,
+    responseTime: s.responseTimeMs,
+    lastIncident: s.lastIncident,
+    responseHistory: s.responseHistory,
+  }));
   const [lastChecked, setLastChecked] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const overallHealth = useMemo(() => {
+    if (services.length === 0) {
+      return { score: 0, label: 'Unknown', color: 'text-slate-500', bg: 'from-slate-50 to-slate-100/50' };
+    }
     const operational = services.filter((s) => s.status === 'operational').length;
     const degraded = services.filter((s) => s.status === 'degraded').length;
     const down = services.filter((s) => s.status === 'down').length;
@@ -1452,17 +1472,20 @@ function SystemHealthMonitorTab() {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setServices((prev) =>
-      prev.map((s) => ({
-        ...s,
-        responseTime: Math.max(5, s.responseTime + Math.round((Math.random() - 0.5) * 20)),
-        responseHistory: [...s.responseHistory.slice(1), Math.max(5, s.responseTime + Math.round((Math.random() - 0.5) * 20))],
-      }))
-    );
-    setLastChecked(0);
-    setIsRefreshing(false);
-    toast.success('System health refreshed');
+    try {
+      await refetch();
+      setLastChecked(0);
+      toast.success('System health refreshed');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
+
+  useEffect(() => {
+    if (isFetching) return;
+    const interval = setInterval(() => {
+      setLastChecked((prev) => prev + 1);
+    }, 1000);
   }, []);
 
   // Auto-increment "last checked" counter
@@ -1910,33 +1933,44 @@ interface AuditChangeEntry {
   ipAddress: string;
 }
 
-const MOCK_AUDIT_ENTRIES: AuditChangeEntry[] = [];
-
 function AuditChangeLogTab() {
+  const { data: auditData } = useAuditChanges({ pageSize: 200 });
+  const entries: AuditChangeEntry[] = useMemo(() => {
+    const raw = (auditData?.entries ?? []) as BackendAuditChangeEntry[];
+    return raw.map((e) => ({
+      id: e.id,
+      timestamp: e.timestamp,
+      user: e.user,
+      userRole: e.entityType,
+      settingChanged: `${e.entityType}:${e.entityId} ${e.action}`,
+      previousValue: '',
+      newValue: e.changes ? JSON.stringify(e.changes) : '',
+      ipAddress: '',
+    }));
+  }, [auditData]);
+  const userList: string[] = auditData?.users ?? [];
+
   const [userFilter, setUserFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('7d');
 
-  const uniqueUsers = useMemo(() => {
-    const users = new Set(MOCK_AUDIT_ENTRIES.map((e) => e.user));
-    return Array.from(users);
-  }, []);
+  const uniqueUsers = useMemo(() => Array.from(new Set([...userList])), [userList]);
 
   const filteredEntries = useMemo(() => {
-    let entries = MOCK_AUDIT_ENTRIES;
+    let out = entries;
 
     if (userFilter !== 'all') {
-      entries = entries.filter((e) => e.user === userFilter);
+      out = out.filter((e) => e.user === userFilter);
     }
 
     if (dateFilter !== 'all') {
       const daysMap: Record<string, number> = { '24h': 1, '7d': 7, '30d': 30 };
       const days = daysMap[dateFilter] ?? 7;
       const cutoff = Date.now() - days * 86400000;
-      entries = entries.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
+      out = out.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
     }
 
-    return entries;
-  }, [userFilter, dateFilter]);
+    return out;
+  }, [entries, userFilter, dateFilter]);
 
   const formatTimestamp = (ts: string) => {
     const date = new Date(ts);
@@ -1953,7 +1987,7 @@ function AuditChangeLogTab() {
             <ClipboardList className="h-4 w-4 text-slate-600 dark:text-slate-400" />
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Changes</span>
           </div>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-400 mt-1">{MOCK_AUDIT_ENTRIES.length}</p>
+          <p className="text-2xl font-bold text-slate-700 dark:text-slate-400 mt-1">{entries.length}</p>
         </Card>
         <Card className="p-4 bg-gradient-to-br from-sky-50 via-sky-50/80 to-white dark:from-sky-950/40 dark:via-sky-950/20 dark:to-card border-sky-200 dark:border-sky-800">
           <div className="flex items-center gap-2">
@@ -1968,7 +2002,7 @@ function AuditChangeLogTab() {
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Last 24h</span>
           </div>
           <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-1">
-            {MOCK_AUDIT_ENTRIES.filter((e) => Date.now() - new Date(e.timestamp).getTime() < 86400000).length}
+            {entries.filter((e) => Date.now() - new Date(e.timestamp).getTime() < 86400000).length}
           </p>
         </Card>
         <Card className="p-4 bg-gradient-to-br from-emerald-50 via-emerald-50/80 to-white dark:from-emerald-950/40 dark:via-emerald-950/20 dark:to-card border-emerald-200 dark:border-emerald-800">

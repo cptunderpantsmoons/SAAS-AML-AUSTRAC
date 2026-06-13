@@ -10,23 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CheckCircle2, Circle, AlertCircle, Clock, X, CalendarDays, ListChecks } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, AlertCircle, Clock, X, CalendarDays, ListChecks, Loader2 } from 'lucide-react';
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, type ComplianceTask } from '@/hooks/useApi';
+import { toast } from 'sonner';
 
 // Types
 type Priority = 'critical' | 'high' | 'medium' | 'low';
-type TaskStatus = 'active' | 'completed' | 'overdue';
 type Category = 'KYC Review' | 'Sanctions' | 'Report Filing' | 'Audit' | 'Training';
-
-interface ComplianceTask {
-  id: string;
-  title: string;
-  description: string;
-  priority: Priority;
-  status: TaskStatus;
-  dueDate: Date;
-  assignee: string;
-  category: Category;
-}
 
 // Constants
 const ASSIGNEES: string[] = [];
@@ -99,16 +89,18 @@ function getInitials(name: string): string {
 }
 
 // Calculate days overdue
-function getDaysOverdue(dueDate: Date): number {
+function getDaysOverdue(dueDate: string | Date): number {
   const now = new Date();
-  const diffMs = now.getTime() - dueDate.getTime();
+  const due = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
+  const diffMs = now.getTime() - due.getTime();
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
 // Time ago formatter
-function timeAgo(date: Date): string {
+function timeAgo(date: string | Date): string {
   const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
+  const due = typeof date === 'string' ? new Date(date) : date;
+  const diffMs = due.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
@@ -120,12 +112,7 @@ function timeAgo(date: Date): string {
   if (diffDays === 0) return 'Due today';
   if (diffDays === 1) return 'Due tomorrow';
   if (diffDays <= 7) return `Due in ${diffDays} days`;
-  return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
-}
-
-// Generate initial sample data
-function createInitialTasks(): ComplianceTask[] {
-  return [];
+  return due.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
 }
 
 // Status filter type
@@ -133,7 +120,12 @@ type StatusFilter = 'all' | 'active' | 'completed' | 'overdue';
 type PriorityFilter = 'all' | Priority;
 
 export function ComplianceTaskManager() {
-  const [tasks, setTasks] = useState<ComplianceTask[]>(createInitialTasks);
+  const tasksQuery = useTasks({ pageSize: 200 });
+  const tasks = (tasksQuery.data?.tasks ?? []) as ComplianceTask[];
+  const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -150,7 +142,7 @@ export function ComplianceTaskManager() {
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       // Auto-detect overdue
-      const isOverdue = task.status !== 'completed' && task.dueDate < new Date();
+      const isOverdue = task.status !== 'completed' && new Date(task.dueDate) < new Date();
       const effectiveStatus = task.status === 'completed' ? 'completed' : (isOverdue ? 'overdue' : 'active');
 
       if (statusFilter !== 'all' && effectiveStatus !== statusFilter) return false;
@@ -162,48 +154,68 @@ export function ComplianceTaskManager() {
   // Task counts
   const taskCounts = useMemo(() => {
     const now = new Date();
-    const active = tasks.filter(t => t.status !== 'completed' && t.dueDate >= now).length;
+    const active = tasks.filter(t => t.status !== 'completed' && new Date(t.dueDate) >= now).length;
     const completed = tasks.filter(t => t.status === 'completed').length;
-    const overdue = tasks.filter(t => t.status !== 'completed' && t.dueDate < now).length;
+    const overdue = tasks.filter(t => t.status !== 'completed' && new Date(t.dueDate) < now).length;
     return { total: tasks.length, active, completed, overdue };
   }, [tasks]);
 
   // Toggle task completion
   const toggleTask = (id: string) => {
-    setTasks(prev =>
-      prev.map(t =>
-        t.id === id
-          ? { ...t, status: t.status === 'completed' ? 'active' : 'completed' }
-          : t
-      )
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const nextStatus: 'active' | 'completed' = task.status === 'completed' ? 'active' : 'completed';
+    updateTask.mutate(
+      { id, data: { status: nextStatus } },
+      {
+        onError: (err) => {
+          toast.error(`Failed to update task: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
     );
   };
 
   // Add new task
   const handleAddTask = () => {
-    if (!newTask.title.trim() || !newTask.dueDate) return;
+    if (!newTask.title.trim() || !newTask.dueDate) {
+      toast.error('Title and due date are required');
+      return;
+    }
+    createTask.mutate(
+      {
+        title: newTask.title.trim(),
+        description: newTask.description.trim(),
+        priority: newTask.priority,
+        due_date: new Date(newTask.dueDate).toISOString(),
+        category: newTask.category,
+        assignee: newTask.assignee || 'Unassigned',
+      },
+      {
+        onSuccess: () => {
+          setNewTask({
+            title: '',
+            description: '',
+            priority: 'medium',
+            dueDate: '',
+            category: 'KYC Review',
+            assignee: '',
+          });
+          setShowAddForm(false);
+          toast.success('Task created');
+        },
+        onError: (err) => {
+          toast.error(`Failed to create task: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
+    );
+  };
 
-    const task: ComplianceTask = {
-      id: String(Date.now()),
-      title: newTask.title.trim(),
-      description: newTask.description.trim(),
-      priority: newTask.priority,
-      status: 'active',
-      dueDate: new Date(newTask.dueDate),
-      assignee: newTask.assignee,
-      category: newTask.category,
-    };
-
-    setTasks(prev => [task, ...prev]);
-    setNewTask({
-      title: '',
-      description: '',
-      priority: 'medium',
-      dueDate: '',
-      category: 'KYC Review',
-      assignee: '',
+  const handleDeleteTask = (id: string) => {
+    deleteTask.mutate(id, {
+      onError: (err) => {
+        toast.error(`Failed to delete task: ${err instanceof Error ? err.message : 'unknown error'}`);
+      },
     });
-    setShowAddForm(false);
   };
 
   return (
@@ -392,7 +404,7 @@ export function ComplianceTaskManager() {
                 </motion.div>
               ) : (
                 filteredTasks.map((task) => {
-                  const isOverdue = task.status !== 'completed' && task.dueDate < new Date();
+                  const isOverdue = task.status !== 'completed' && new Date(task.dueDate) < new Date();
                   const isCompleted = task.status === 'completed';
                   const priorityConf = PRIORITY_CONFIG[task.priority];
                   const daysOverdue = isOverdue ? getDaysOverdue(task.dueDate) : 0;
@@ -432,7 +444,7 @@ export function ComplianceTaskManager() {
                               {isOverdue && (
                                 <p className="text-[10px] text-red-500/80 mt-0.5 flex items-center gap-1">
                                   <CalendarDays className="h-3 w-3" />
-                                  Due: {task.dueDate.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  Due: {new Date(task.dueDate).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 </p>
                               )}
                             </div>

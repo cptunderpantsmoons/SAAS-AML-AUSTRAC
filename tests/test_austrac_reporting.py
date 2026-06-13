@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from typing import Any
+from unittest.mock import patch
 from uuid import UUID
 
 import httpx
@@ -154,10 +155,22 @@ class TestXSDValidation:
         assert valid is False
         assert len(errors) > 0
 
-    def test_xsd_file_not_found(self) -> None:
+    def test_xsd_file_not_found(self, tmp_path) -> None:
+        import austrac_reporting.xml_schemas as xml_schemas_mod
         import pytest
-        with pytest.raises(ValueError):
-            XSDValidator._load_schema(ReportType("nonexistent"))
+        from austrac_reporting.xml_schemas import XSDValidator
+
+        # Reset the schema cache and point XSD_DIR at an empty directory so
+        # no XSD file exists for ``ReportType.SMR``.  This exercises the
+        # missing-file branch of ``_load_schema``.
+        original_dir = xml_schemas_mod.XSD_DIR
+        with patch.object(XSDValidator, "_schemas", {}):
+            xml_schemas_mod.XSD_DIR = tmp_path
+            try:
+                with pytest.raises(ValueError, match="XSD schema not found"):
+                    XSDValidator._load_schema(ReportType.SMR)
+            finally:
+                xml_schemas_mod.XSD_DIR = original_dir
 
 
 class TestSMRGenerator:

@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Shield, Search, Globe, AlertTriangle, CheckCircle2,
   XCircle, Clock, Eye, ChevronDown, ChevronUp, RefreshCw,
-  ShieldAlert, ShieldCheck, ShieldOff
+  ShieldAlert, ShieldCheck, ShieldOff, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,37 +13,26 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { useClients, useAlerts } from '@/hooks/useApi';
+import {
+  useClients,
+  useAlerts,
+  useSanctionsSources,
+  useSanctionsMatches,
+  useScreenName,
+  useUpdateSanctionsMatch,
+  type SanctionsSource,
+  type SanctionsMatch,
+} from '@/hooks/useApi';
 import { RiskBadge } from '@/components/shared/RiskBadge';
+import { toast } from 'sonner';
 
 interface SanctionsScreeningPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Screening source configuration
-const SCREENING_SOURCES: Array<Record<string, unknown>> = [];
-
 type MatchType = 'Exact' | 'Partial' | 'Fuzzy';
 type ScreeningStatus = 'Pending Review' | 'Confirmed Match' | 'False Positive' | 'Cleared';
-
-interface ScreeningMatch {
-  id: string;
-  clientName: string;
-  clientId: string;
-  source: string;
-  confidence: number;
-  matchType: MatchType;
-  status: ScreeningStatus;
-  listedEntity: string;
-  listedEntityId: string;
-  program: string;
-  screenedAt: string;
-}
-
-function generateSampleData(_clientNames: string[]): ScreeningMatch[] {
-  return [];
-}
 
 function getConfidenceColor(confidence: number): string {
   if (confidence > 80) return 'text-red-600 dark:text-red-400';
@@ -103,23 +92,35 @@ function formatTimeAgo(dateStr: string): string {
 export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
-  const [matches, setMatches] = useState<ScreeningMatch[]>([]);
+  const [activeMatches, setActiveMatches] = useState<SanctionsMatch[]>([]);
   const [hasScreened, setHasScreened] = useState(false);
 
-  // Fetch real client names for integration
+  // Real backend data
   const { data: clientsData } = useClients({ limit: 10 });
   const { data: alertsData } = useAlerts({ limit: 5, alertType: 'sanctions_screening' });
+  const { data: sources = [] } = useSanctionsSources();
+  const { data: matchesData } = useSanctionsMatches({ pageSize: 100 });
+  const screenMutation = useScreenName();
+  const updateMatchMutation = useUpdateSanctionsMatch();
+
+  const persistedMatches = (matchesData?.matches ?? []) as SanctionsMatch[];
 
   const clientNames = useMemo(() => {
     const clients = (clientsData?.clients ?? []) as Array<Record<string, unknown>>;
     return clients.map(c => (c.fullName as string) ?? (c.businessName as string) ?? '').filter(Boolean);
   }, [clientsData?.clients]);
 
-  // Initialize sample data with real client names
-  const initialMatches = useMemo(() => generateSampleData(clientNames), [clientNames]);
+  // Display the user's freshly-screened matches, falling back to the
+  // persisted history.  This way the operator sees immediate feedback
+  // after running a query but the historical list is not wiped between
+  // sessions.
+  const displayMatches = hasScreened ? activeMatches : persistedMatches;
 
-  // Use initialized data if no screening has been done
-  const displayMatches = hasScreened ? matches : initialMatches;
+  // The "Refresh" button should re-screen against the current query.
+  useEffect(() => {
+    if (!hasScreened) return;
+    setActiveMatches(persistedMatches);
+  }, [persistedMatches, hasScreened]);
 
   const filteredMatches = useMemo(() => {
     if (!searchQuery.trim()) return displayMatches;
@@ -145,25 +146,35 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
   const handleScreen = () => {
     const query = searchQuery.trim();
     if (!query) {
-      setMatches(initialMatches);
-    } else {
-      // Filter matches based on search query
-      const filtered = initialMatches.filter(
-        m => m.clientName.toLowerCase().includes(query.toLowerCase()) ||
-          m.listedEntity.toLowerCase().includes(query.toLowerCase())
-      );
-      setMatches(filtered.length > 0 ? filtered : initialMatches);
+      toast.error('Enter a name or entity to screen');
+      return;
     }
-    setHasScreened(true);
+    screenMutation.mutate(
+      { query, clientName: query },
+      {
+        onSuccess: (matches) => {
+          setActiveMatches(matches);
+          setHasScreened(true);
+        },
+        onError: (err) => {
+          toast.error(`Screen failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
+    );
   };
 
   const handleStatusChange = (matchId: string, newStatus: ScreeningStatus) => {
-    const updateList = (list: ScreeningMatch[]) =>
-      list.map(m => m.id === matchId ? { ...m, status: newStatus } : m);
-    setMatches(updateList(matches));
-    if (!hasScreened) {
-      setHasScreened(true);
-    }
+    updateMatchMutation.mutate(
+      { id: matchId, status: newStatus },
+      {
+        onSuccess: () => {
+          setActiveMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, status: newStatus } : m));
+        },
+        onError: (err) => {
+          toast.error(`Update failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -210,8 +221,15 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/30">
-                  NO DATA
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] h-5 px-1.5 ${
+                    summaryStats.total === 0
+                      ? 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/30'
+                      : 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
+                  }`}
+                >
+                  {summaryStats.total === 0 ? 'NO DATA' : `${summaryStats.total} MATCHES`}
                 </Badge>
                 <Button
                   variant="ghost"
@@ -230,7 +248,7 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Screening Sources</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {SCREENING_SOURCES.length === 0 ? (
+                    {sources.length === 0 ? (
                       <div className="col-span-2 text-center py-6">
                         <div className="h-12 w-12 rounded-xl bg-muted/30 mx-auto flex items-center justify-center mb-3">
                           <Shield className="h-5 w-5 text-muted-foreground" />
@@ -239,7 +257,7 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                         <p className="text-xs text-muted-foreground mt-1">Add data sources in Settings to begin screening</p>
                       </div>
                     ) : (
-                      SCREENING_SOURCES.map((source, idx) => (
+                      sources.map((source: SanctionsSource, idx: number) => (
                         <motion.div
                           key={source.id}
                           initial={{ opacity: 0, y: 10 }}
@@ -249,20 +267,21 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                           <Card className="border border-border hover:shadow-sm transition-shadow">
                             <CardContent className="p-3">
                               <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-base">{source.icon as string}</span>
-                                <span className="text-xs font-semibold truncate">{source.name as string}</span>
+                                <span className="text-base">🛡️</span>
+                                <span className="text-xs font-semibold truncate">{source.name}</span>
                               </div>
-                              <p className="text-[10px] text-muted-foreground mb-1.5">{source.description as string}</p>
+                              <p className="text-[10px] text-muted-foreground mb-1.5">
+                                {source.entriesIndexed.toLocaleString()} indexed entries
+                              </p>
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] text-muted-foreground">
                                   <Clock className="h-2.5 w-2.5 inline mr-0.5" />
-                                  {source.lastUpdated as string}
+                                  {source.lastCheck ? new Date(source.lastCheck).toLocaleDateString() : 'never'}
                                 </span>
                                 <Badge variant="outline" className="text-[8px] h-4 px-1 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
-                                  LIVE
+                                  {source.enabled ? 'LIVE' : 'OFFLINE'}
                                 </Badge>
                               </div>
-                              <p className="text-[9px] text-muted-foreground mt-1">{(source.totalEntries as number).toLocaleString()} entries</p>
                             </CardContent>
                           </Card>
                         </motion.div>
@@ -290,8 +309,13 @@ export function SanctionsScreeningPanel({ isOpen, onClose }: SanctionsScreeningP
                     <Button
                       className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-200 dark:shadow-amber-900/50 transition-all duration-200 shrink-0"
                       onClick={handleScreen}
+                      disabled={screenMutation.isPending}
                     >
-                      <Shield className="h-4 w-4 mr-1.5" />
+                      {screenMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <Shield className="h-4 w-4 mr-1.5" />
+                      )}
                       Screen
                     </Button>
                   </div>

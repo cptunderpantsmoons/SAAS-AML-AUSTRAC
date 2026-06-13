@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 
 from austrac_reporting.config import Settings, get_settings
 from austrac_reporting.dlq import DeadLetterQueue
@@ -21,6 +21,7 @@ from austrac_reporting.models import (
     GenerateReportResponse,
     NarrativeDraft,
     ReportType,
+    UpdateReportRequest,
 )
 from austrac_reporting.xml_schemas import XSDValidator
 
@@ -42,6 +43,11 @@ async def lifespan(app: FastAPI) -> Any:
     yield
     if _gateway is not None:
         await _gateway.close()
+    if _dlq is not None and hasattr(_dlq, "close"):
+        try:
+            await _dlq.close()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to close DLQ cleanly: %s", exc)
     logger.info("AUSTRAC Reporting service stopped")
 
 
@@ -154,7 +160,7 @@ async def get_report(report_id: str) -> dict[str, Any]:
 
 
 @app.patch("/reports/{report_id}")
-async def update_report(report_id: str, request: Request) -> dict[str, Any]:
+async def update_report(report_id: str, request: UpdateReportRequest) -> dict[str, Any]:
     try:
         rid = UUID(report_id)
     except ValueError as exc:
@@ -162,8 +168,18 @@ async def update_report(report_id: str, request: Request) -> dict[str, Any]:
     report = _report_registry.get(rid)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    body = await request.json()
-    report.update(body)
+
+    # Apply the typed request fields one at a time so a malicious or
+    # over-permissive client cannot overwrite the canonical report
+    # attributes (xml_content, xsd_valid, report_id, ...).
+    body = request.model_dump(exclude_unset=True)
+    allowed: dict[str, Any] = {}
+    for key, value in body.items():
+        if value is None:
+            continue
+        if key in {"status", "notes", "assigned_to", "metadata"}:
+            allowed[key] = value
+    report.update(allowed)
     return {"id": report_id, **report}
 
 
@@ -173,6 +189,34 @@ async def transmit_report(
 ) -> dict[str, Any]:
     if _gateway is None:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
+    # Validate the report exists in our registry before attempting to
+    # transmit; otherwise a bogus report_id would silently send arbitrary
+    # XML to the regulator.
+    report = _report_registry.get(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Report {report_id} not found")
+    # If the report_type and xml_content query/body params are not supplied
+    # by the caller, fall back to the values recorded when the report was
+    # generated.
+    if not report_type:
+        report_type = report.get("report_type", "")
+    if not xml_content:
+        xml_content = report.get("xml_content", "")
+    if not report_type or not xml_content:
+        raise HTTPException(
+            status_code=400,
+            detail="report_type and xml_content are required (either as request params or in the stored report)",
+        )
+
+    # Pre-compute the message_id we would have used so the DLQ entry can be
+    # correlated with the failed transmission even if the gateway is never
+    # reached.
+    import hashlib
+
+    derived_message_id = UUID(
+        hashlib.sha256(f"{report_type}|{report_id}|{xml_content}".encode()).hexdigest()[:32]
+    )
+
     try:
         result = await _gateway.transmit(report_type, xml_content, report_id)
         return {
@@ -183,8 +227,10 @@ async def transmit_report(
     except GatewayError as exc:
         logger.error("Transmission failed: %s", exc)
         if _dlq is not None:
+            # Preserve the gateway-derived message_id so the DLQ entry can
+            # be correlated with the failed transmission.
             await _dlq.enqueue(
-                message_id=UUID(int=0),
+                message_id=derived_message_id,
                 payload={
                     "report_id": str(report_id),
                     "report_type": report_type,

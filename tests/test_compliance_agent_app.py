@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
+import time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -14,6 +17,20 @@ from compliance_agent.ingestion import IngestionPipeline
 from compliance_agent.mail_client import AgentMailClient
 from compliance_agent.models import AgentTask, ChatResponse, EmailIngestionResult
 from compliance_agent.service_client import ComplianceServiceClient
+
+# A test-only HMAC secret used to sign webhook requests.
+TEST_WEBHOOK_SECRET = "test-webhook-secret-do-not-use-in-prod"
+
+
+def _sign_webhook(body: bytes, ts: int | None = None, secret: str = TEST_WEBHOOK_SECRET) -> dict[str, str]:
+    """Return headers that satisfy the ingestion webhook's HMAC check."""
+    ts_value = str(ts if ts is not None else int(time.time()))
+    mac = hmac.new(secret.encode("utf-8"), f"{ts_value}.".encode() + body, hashlib.sha256).hexdigest()
+    return {
+        "X-Webhook-Timestamp": ts_value,
+        "X-Webhook-Signature": f"sha256={mac}",
+        "Content-Type": "application/json",
+    }
 
 
 def _mock_auth(app: Any) -> None:
@@ -37,6 +54,8 @@ def reset_app_globals(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "_mail_client", None)
     monkeypatch.setattr(app_module, "_ingestion_pipeline", None)
     monkeypatch.setattr(app_module, "_task_store", {})
+    # The ingestion webhook refuses to run without a configured HMAC secret.
+    monkeypatch.setenv("COMPLIANCE_AGENTMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
 
 
 @pytest.fixture(autouse=True)
@@ -302,28 +321,33 @@ class TestIngestionWebhook:
         app = create_app()
         _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
+        body = {
+            "event_id": "evt-1",
+            "message": {
+                "message_id": "msg-webhook-1",
+                "inbox_id": "inbox-1",
+                "from": "a@b.com",
+                "to": ["c@d.com"],
+                "subject": "Test",
+                "text": "Screen entity Acme Corp.",
+                "attachments": [
+                    {
+                        "attachment_id": "att-1",
+                        "filename": "doc.pdf",
+                        "size": 100,
+                        "content_type": "application/pdf",
+                    }
+                ],
+            },
+        }
+        import json as _json
+
+        raw = _json.dumps(body).encode("utf-8")
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
                 "/agent/ingestion/webhook",
-                json={
-                    "event_id": "evt-1",
-                    "message": {
-                        "message_id": "msg-webhook-1",
-                        "inbox_id": "inbox-1",
-                        "from": "a@b.com",
-                        "to": ["c@d.com"],
-                        "subject": "Test",
-                        "text": "Screen entity Acme Corp.",
-                        "attachments": [
-                            {
-                                "attachment_id": "att-1",
-                                "filename": "doc.pdf",
-                                "size": 100,
-                                "content_type": "application/pdf",
-                            }
-                        ],
-                    },
-                },
+                content=raw,
+                headers=_sign_webhook(raw),
             )
             assert resp.status_code == 200
             data = resp.json()
@@ -339,8 +363,15 @@ class TestIngestionWebhook:
         app = create_app()
         _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
+        import json as _json
+
+        raw = _json.dumps({"message": {}}).encode("utf-8")
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/agent/ingestion/webhook", json={"message": {}})
+            resp = await client.post(
+                "/agent/ingestion/webhook",
+                content=raw,
+                headers=_sign_webhook(raw),
+            )
             assert resp.status_code == 503
 
     @pytest.mark.asyncio
@@ -351,10 +382,52 @@ class TestIngestionWebhook:
         app = create_app()
         _mock_auth(app)
         transport = httpx.ASGITransport(app=app)
+        import json as _json
+
+        raw = _json.dumps({"message": {"attachments": [123]}}).encode("utf-8")
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             # Non-dict attachment causes AttributeError during construction
             resp = await client.post(
                 "/agent/ingestion/webhook",
-                json={"message": {"attachments": [123]}},
+                content=raw,
+                headers=_sign_webhook(raw),
             )
             assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_returns_401_for_bad_signature(self, app_module: Any) -> None:
+        mock_pipeline = MagicMock(spec=IngestionPipeline)
+        app_module._ingestion_pipeline = mock_pipeline
+
+        app = create_app()
+        _mock_auth(app)
+        transport = httpx.ASGITransport(app=app)
+        import json as _json
+
+        raw = _json.dumps({"message": {}}).encode("utf-8")
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/agent/ingestion/webhook",
+                content=raw,
+                headers={
+                    "X-Webhook-Timestamp": str(int(time.time())),
+                    "X-Webhook-Signature": "sha256=deadbeef",
+                },
+            )
+            assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_returns_401_for_missing_signature_header(self, app_module: Any) -> None:
+        app_module._ingestion_pipeline = MagicMock(spec=IngestionPipeline)
+        app = create_app()
+        _mock_auth(app)
+        transport = httpx.ASGITransport(app=app)
+        import json as _json
+
+        raw = _json.dumps({"message": {}}).encode("utf-8")
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/agent/ingestion/webhook",
+                content=raw,
+            )
+            assert resp.status_code == 401

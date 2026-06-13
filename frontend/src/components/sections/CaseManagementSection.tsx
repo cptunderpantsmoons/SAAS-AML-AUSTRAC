@@ -7,7 +7,7 @@ import {
   AlertTriangle, FileText, DollarSign, Clock, User, MessageSquare,
   ArrowUpRight, X, Link2, Paperclip, Send, MoreHorizontal,
   CheckCircle2, CircleDot, Circle, Eye, UserCheck, AlertCircle,
-  BarChart3, FolderOpen, Zap, ChevronLeft, ChevronRight
+  BarChart3, FolderOpen, Zap, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,61 +25,33 @@ import { RiskBadge } from '@/components/shared/RiskBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
+import {
+  useCases,
+  useCreateCase,
+  useUpdateCase,
+  useDeleteCase,
+  useAddCaseNote,
+  type AmlCase,
+  type CaseNote,
+  type StatusChange,
+  type LinkedEvidence,
+  type CreateCasePayload,
+  type UpdateCasePayload,
+} from '@/hooks/useApi';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CasePriority = 'critical' | 'high' | 'medium' | 'low';
 type CaseStatus = 'open' | 'in_progress' | 'escalated' | 'closed';
-type CaseType = 'SAR Investigation' | 'PEP Review' | 'Sanctions Review' | 'Transaction Review' | 'KYC Discrepancy';
 
-interface CaseNote {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: string;
-}
-
-interface StatusChange {
-  status: CaseStatus;
-  timestamp: string;
-  actor: string;
-  note?: string;
-}
-
-interface LinkedEvidence {
-  id: string;
-  type: 'document' | 'alert' | 'transaction';
-  title: string;
-  description: string;
-  date: string;
-}
-
-interface AmlCase {
-  id: string;
-  caseId: string;
-  title: string;
-  description: string;
-  type: CaseType;
-  priority: CasePriority;
-  status: CaseStatus;
-  assignedTo: string;
-  clientId: string;
-  clientName: string;
-  linkedAlerts: string[];
-  linkedDocuments: string[];
-  createdAt: string;
-  updatedAt: string;
-  closedAt: string | null;
-  notes: CaseNote[];
-  statusTimeline: StatusChange[];
-  linkedEvidence: LinkedEvidence[];
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const TEAM_MEMBERS: string[] = [];
-
-const MOCK_CASES: AmlCase[] = [];
+const CASE_TYPES = [
+  'SAR Investigation',
+  'PEP Review',
+  'Sanctions Review',
+  'Transaction Review',
+  'KYC Discrepancy',
+] as const;
+type CaseType = (typeof CASE_TYPES)[number];
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
@@ -240,18 +212,26 @@ function CaseStatisticsChart({ cases }: { cases: AmlCase[] }) {
 
 // ─── Create Case Dialog ──────────────────────────────────────────────────────
 
-function CreateCaseDialog({ open, onOpenChange, onCreateCase }: {
+function CreateCaseDialog({ open, onOpenChange, onCreated }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateCase: (newCase: AmlCase) => void;
+  onCreated: (newCase: AmlCase) => void;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [caseType, setCaseType] = useState<CaseType | ''>('');
   const [priority, setPriority] = useState<CasePriority | ''>('');
   const [clientName, setClientName] = useState('');
+  const [clientId, setClientId] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [linkedAlerts, setLinkedAlerts] = useState('');
+
+  const createMutation = useCreateCase();
+
+  const resetForm = useCallback(() => {
+    setTitle(''); setDescription(''); setCaseType(''); setPriority('');
+    setClientName(''); setClientId(''); setAssignedTo(''); setLinkedAlerts('');
+  }, []);
 
   const handleSubmit = () => {
     if (!title || !caseType || !priority || !clientName) {
@@ -259,41 +239,31 @@ function CreateCaseDialog({ open, onOpenChange, onCreateCase }: {
       return;
     }
 
-    const newCase: AmlCase = {
-      id: String(Date.now()),
-      caseId: `CASE-2026-${String(MOCK_CASES.length + 1).padStart(3, '0')}`,
+    const payload: CreateCasePayload = {
       title,
       description,
       type: caseType as CaseType,
       priority: priority as CasePriority,
-      status: 'open',
-      assignedTo: assignedTo || 'Unassigned',
-      clientId: `CLT-${String(Math.floor(Math.random() * 100)).padStart(3, '0')}`,
-      clientName,
-      linkedAlerts: linkedAlerts ? linkedAlerts.split(',').map(a => a.trim()) : [],
-      linkedDocuments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      closedAt: null,
-      notes: [],
-      statusTimeline: [
-        { status: 'open', timestamp: new Date().toISOString(), actor: 'Current User', note: 'Case created manually' },
-      ],
-      linkedEvidence: linkedAlerts ? linkedAlerts.split(',').map((a, i) => ({
-        id: a.trim(),
-        type: 'alert' as const,
-        title: `Linked Alert ${i + 1}`,
-        description: `Alert ${a.trim()}`,
-        date: new Date().toISOString().split('T')[0],
-      })) : [],
+      client_id: clientId,
+      client_name: clientName,
+      assigned_to: assignedTo || 'Unassigned',
+      linked_alerts: linkedAlerts
+        ? linkedAlerts.split(',').map((a) => a.trim()).filter(Boolean)
+        : [],
+      linked_documents: [],
     };
 
-    onCreateCase(newCase);
-    // Reset form
-    setTitle(''); setDescription(''); setCaseType(''); setPriority('');
-    setClientName(''); setAssignedTo(''); setLinkedAlerts('');
-    onOpenChange(false);
-    toast.success(`Case ${newCase.caseId} created successfully`);
+    createMutation.mutate(payload, {
+      onSuccess: (created) => {
+        onCreated(created);
+        resetForm();
+        onOpenChange(false);
+        toast.success(`Case ${created.caseId} created successfully`);
+      },
+      onError: (err) => {
+        toast.error(`Failed to create case: ${err instanceof Error ? err.message : 'unknown error'}`);
+      },
+    });
   };
 
   return (
@@ -366,15 +336,21 @@ function CreateCaseDialog({ open, onOpenChange, onCreateCase }: {
           </div>
 
           <div className="space-y-2">
+            <label className="text-sm font-medium">Client ID (optional)</label>
+            <Input
+              placeholder="Backend entity ID, e.g. co-abc12345"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium">Assign To</label>
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
-              <SelectContent>
-                {TEAM_MEMBERS.map((member) => (
-                  <SelectItem key={member} value={member}>{member}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              placeholder="Compliance officer user id"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+            />
           </div>
 
           <div className="space-y-2">
@@ -389,9 +365,16 @@ function CreateCaseDialog({ open, onOpenChange, onCreateCase }: {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>
-            <Plus className="h-4 w-4 mr-1" /> Create Case
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={createMutation.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={createMutation.isPending}>
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4 mr-1" />
+            )}
+            Create Case
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -408,55 +391,54 @@ function CaseDetailView({ caseData, onClose, onUpdateCase }: {
 }) {
   const [newNote, setNewNote] = useState('');
   const [activeTab, setActiveTab] = useState<'timeline' | 'evidence' | 'notes'>('notes');
+  const addNoteMutation = useAddCaseNote();
+  const updateMutation = useUpdateCase();
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
-    const updated: AmlCase = {
-      ...caseData,
-      notes: [...caseData.notes, {
-        id: `n-${Date.now()}`,
-        author: 'Current User',
-        content: newNote.trim(),
-        timestamp: new Date().toISOString(),
-      }],
-      updatedAt: new Date().toISOString(),
-    };
-    onUpdateCase(updated);
-    setNewNote('');
-    toast.success('Note added successfully');
+    addNoteMutation.mutate(
+      { id: caseData.id, author: 'compliance_officer', content: newNote.trim() },
+      {
+        onSuccess: (updated) => {
+          onUpdateCase(updated);
+          setNewNote('');
+          toast.success('Note added successfully');
+        },
+        onError: (err) => {
+          toast.error(`Failed to add note: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
+    );
+  };
+
+  const sendUpdate = (data: UpdateCasePayload) => {
+    updateMutation.mutate(
+      { id: caseData.id, data },
+      {
+        onSuccess: (updated) => {
+          onUpdateCase(updated);
+        },
+        onError: (err) => {
+          toast.error(`Failed to update case: ${err instanceof Error ? err.message : 'unknown error'}`);
+        },
+      },
+    );
   };
 
   const handleAction = (action: 'escalate' | 'close' | 'reassign') => {
-    const now = new Date().toISOString();
-    let updated = { ...caseData, updatedAt: now };
-
     if (action === 'escalate' && caseData.status !== 'escalated') {
-      updated.status = 'escalated';
-      updated.statusTimeline = [...updated.statusTimeline, {
-        status: 'escalated', timestamp: now, actor: 'Current User', note: 'Case escalated to senior management',
-      }];
+      sendUpdate({ status: 'escalated', note: 'Case escalated to senior management' });
       toast.success(`Case ${caseData.caseId} escalated`);
     } else if (action === 'close' && caseData.status !== 'closed') {
-      updated.status = 'closed';
-      updated.closedAt = now;
-      updated.statusTimeline = [...updated.statusTimeline, {
-        status: 'closed', timestamp: now, actor: 'Current User', note: 'Case closed',
-      }];
+      sendUpdate({ status: 'closed', note: 'Case closed' });
       toast.success(`Case ${caseData.caseId} closed`);
     } else if (action === 'reassign') {
-      const otherMembers = TEAM_MEMBERS.filter(m => m !== caseData.assignedTo);
-      const newAssignee = otherMembers[Math.floor(Math.random() * otherMembers.length)];
-      updated.assignedTo = newAssignee;
-      updated.notes = [...updated.notes, {
-        id: `n-${Date.now()}`,
-        author: 'Current User',
-        content: `Case reassigned from ${caseData.assignedTo} to ${newAssignee}`,
-        timestamp: now,
-      }];
-      toast.success(`Case reassigned to ${newAssignee}`);
+      const next = window.prompt('Reassign case to (user id):', caseData.assignedTo);
+      if (next && next.trim() && next !== caseData.assignedTo) {
+        sendUpdate({ assigned_to: next.trim() });
+        toast.success(`Case reassigned to ${next}`);
+      }
     }
-
-    onUpdateCase(updated);
   };
 
   const pConfig = priorityConfig[caseData.priority];
@@ -546,7 +528,7 @@ function CaseDetailView({ caseData, onClose, onUpdateCase }: {
             {[
               { key: 'notes', label: 'Notes & Activity', icon: MessageSquare, count: caseData.notes.length },
               { key: 'timeline', label: 'Status Timeline', icon: Clock, count: caseData.statusTimeline.length },
-              { key: 'evidence', label: 'Linked Evidence', icon: Link2, count: caseData.linkedEvidence.length },
+              { key: 'evidence', label: 'Linked Evidence', icon: Link2, count: (caseData.linkedEvidence ?? []).length },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -628,14 +610,14 @@ function CaseDetailView({ caseData, onClose, onUpdateCase }: {
 
               {activeTab === 'evidence' && (
                 <ScrollArea className="max-h-64">
-                  {caseData.linkedEvidence.length === 0 ? (
+                  {caseData.linkedEvidence && caseData.linkedEvidence.length > 0 ? (
                     <div className="text-center py-6 text-sm text-muted-foreground">
                       <Link2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
                       No linked evidence yet.
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      {caseData.linkedEvidence.map((ev) => (
+                      {(caseData.linkedEvidence ?? []).map((ev) => (
                         <EvidenceItem key={ev.id} evidence={ev} />
                       ))}
                     </div>
@@ -653,7 +635,16 @@ function CaseDetailView({ caseData, onClose, onUpdateCase }: {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CaseManagementSection() {
-  const [cases, setCases] = useState<AmlCase[]>(MOCK_CASES);
+  const [filters, setFilters] = useState<{
+    status?: string;
+    priority?: string;
+    caseType?: string;
+    assignedTo?: string;
+    search?: string;
+  }>({});
+  const casesQuery = useCases({ pageSize: 100, ...filters });
+  const cases = (casesQuery.data?.cases ?? []) as AmlCase[];
+  const assignees = casesQuery.data?.assignees ?? [];
   const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
@@ -670,6 +661,19 @@ export function CaseManagementSection() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // Keep the API filters in sync with the UI selections.
+  useMemo(() => {
+    const next: typeof filters = {};
+    if (statusFilter !== 'all') next.status = statusFilter;
+    if (priorityFilter !== 'all') next.priority = priorityFilter;
+    if (typeFilter !== 'all') next.caseType = typeFilter;
+    if (assigneeFilter !== 'all') next.assignedTo = assigneeFilter;
+    if (searchQuery.trim()) next.search = searchQuery.trim();
+    if (JSON.stringify(next) !== JSON.stringify(filters)) {
+      setFilters(next);
+    }
+  }, [statusFilter, priorityFilter, typeFilter, assigneeFilter, searchQuery]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -725,22 +729,25 @@ export function CaseManagementSection() {
   }, [cases, statusFilter, priorityFilter, typeFilter, assigneeFilter, searchQuery, sortBy]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredCases.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredCases.length / pageSize));
   const paginatedCases = filteredCases.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleUpdateCase = useCallback((updatedCase: AmlCase) => {
-    setCases(prev => prev.map(c => c.id === updatedCase.id ? updatedCase : c));
-  }, []);
+    // The query cache is invalidated by the mutation hook; this callback
+    // only needs to close the expanded view if the case was removed.
+    if (cases.findIndex((c) => c.id === updatedCase.id) === -1) {
+      setExpandedCaseId(null);
+    }
+  }, [cases]);
 
-  const handleCreateCase = useCallback((newCase: AmlCase) => {
-    setCases(prev => [newCase, ...prev]);
+  const handleCreateCase = useCallback((_newCase: AmlCase) => {
     setCurrentPage(1);
   }, []);
 
   const activeFilters = [statusFilter, priorityFilter, typeFilter, assigneeFilter].filter(f => f !== 'all').length;
 
-  // Unique assignees from cases
-  const assignees = useMemo(() => [...new Set(cases.map(c => c.assignedTo))].sort(), [cases]);
+  // Use the assignees returned by the backend so the dropdown stays in
+  // sync with whoever currently owns a case.
   const caseTypes = useMemo(() => [...new Set(cases.map(c => c.type))].sort(), [cases]);
 
   return (
@@ -1063,7 +1070,7 @@ export function CaseManagementSection() {
       <CreateCaseDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onCreateCase={handleCreateCase}
+        onCreated={handleCreateCase}
       />
     </div>
   );

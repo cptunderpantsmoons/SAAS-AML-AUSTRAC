@@ -1,0 +1,16 @@
+# Kustomize configuration file — documents the placeholder tokens that
+# must be substituted before ``kubectl apply``.
+#
+# Usage with envsubst:
+#   export DOCUMENT_ENGINE_IRSA_ROLE_ARN="$(terraform output -raw document_engine_irsa_role_arn)"
+#   envsubst < k8s/base/serviceaccount.yaml | kubectl apply -f -
+#
+# Placeholders used across the manifests:
+#
+#   REPLACE_WITH_TERRAFORM_OUTPUT_document_engine_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_ubo_graph_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_austrac_reporting_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_governance_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_transaction_monitoring_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_compliance_agent_irsa_role_arn
+#   REPLACE_WITH_TERRAFORM_OUTPUT_efs_neo4j_file_system_id

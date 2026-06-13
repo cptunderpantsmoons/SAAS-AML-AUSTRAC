@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
+import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
 from auth import init_supertokens, setup_supertokens_middleware
 from auth.config import get_auth_settings
 from auth.dependencies import get_session, require_role
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 
 from compliance_agent.agent import run_agent_chat
 from compliance_agent.config import Settings, get_settings
@@ -158,9 +161,53 @@ async def get_task(task_id: str) -> AgentTask:
     response_model=EmailIngestionResult,
     dependencies=[Depends(require_role("compliance_officer"))],
 )
-async def ingestion_webhook(payload: dict[str, Any]) -> EmailIngestionResult:
+async def ingestion_webhook(payload: dict[str, Any], request: Request) -> EmailIngestionResult:
     if _ingestion_pipeline is None:
         raise HTTPException(status_code=503, detail="Ingestion pipeline not initialised")
+
+    # Verify the HMAC signature on the raw request body.  The AgentMail
+    # platform (or any caller) must include ``X-Webhook-Signature: sha256=<hex>``
+    # and ``X-Webhook-Timestamp`` (unix seconds) headers; we recompute the
+    # HMAC over ``<timestamp>.<body>`` using the shared secret
+    # ``COMPLIANCE_AGENTMAIL_WEBHOOK_SECRET`` and compare in constant time.
+    # If the secret is unset we refuse the request — an unauthenticated
+    # webhook is a remote code execution vector.
+    webhook_secret = os.getenv("COMPLIANCE_AGENTMAIL_WEBHOOK_SECRET", "")
+    if not webhook_secret:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "COMPLIANCE_AGENTMAIL_WEBHOOK_SECRET is not configured; the "
+                "ingestion webhook is disabled until the operator sets it."
+            ),
+        )
+    sig_header = request.headers.get("X-Webhook-Signature", "")
+    ts_header = request.headers.get("X-Webhook-Timestamp", "")
+    if not sig_header.startswith("sha256="):
+        raise HTTPException(status_code=401, detail="Missing or malformed X-Webhook-Signature header")
+    if not ts_header:
+        raise HTTPException(status_code=401, detail="Missing X-Webhook-Timestamp header")
+    try:
+        ts_int = int(ts_header)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="X-Webhook-Timestamp must be a unix timestamp") from exc
+    # 5-minute clock skew window to prevent replay attacks.
+    import time as _time
+
+    if abs(int(_time.time()) - ts_int) > 300:
+        raise HTTPException(status_code=401, detail="Webhook timestamp outside acceptable window")
+    # We re-serialise the parsed JSON so the signature matches what the
+    # caller signed.  Callers should sign the raw bytes; this is a best-
+    # effort check for a JSON body.
+    raw_body = await request.body()
+    expected = hmac.new(
+        webhook_secret.encode("utf-8"),
+        f"{ts_header}.".encode() + raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    provided = sig_header.split("=", 1)[1]
+    if not hmac.compare_digest(expected, provided):
+        raise HTTPException(status_code=401, detail="Webhook signature verification failed")
 
     from datetime import UTC, datetime
 

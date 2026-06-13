@@ -205,16 +205,44 @@ def _aggregate_risk_score(ws: WorkflowState, settings: Settings) -> RiskScoreRes
 
 
 async def _run_document_analysis(ws: WorkflowState, settings: Settings) -> dict[str, Any]:
-    """Call the Sprint 1 Document Detection Engine."""
+    """Call the Sprint 1 Document Detection Engine.
+
+    The detection engine exposes a POST /api/v1/documents/analyze endpoint
+    that performs analysis on an uploaded file.  In a real flow the document
+    would have been uploaded already; here we query the list of analyses
+    already performed for this onboarding (the engine stores them keyed by
+    analysis_id) and use the most recent one.
+    """
     async with httpx.AsyncClient(base_url=settings.detection_engine_url, timeout=30.0) as client:
-        # In a real flow the document would have been uploaded already;
-        # here we query the analysis status using the onboarding ID.
-        resp = await client.get(f"/api/v1/documents/analyze/{ws.onboarding_id}")
-        if resp.status_code == 200:
-            result: dict[str, Any] = resp.json()
-            return result
+        try:
+            resp = await client.get("/api/v1/documents")
+            if resp.status_code == 200:
+                payload = resp.json()
+                documents = payload.get("documents", []) if isinstance(payload, dict) else []
+                # Find the most recent document whose analysis_id matches
+                # this onboarding_id, or fall back to the most recent one.
+                match = next(
+                    (d for d in documents if d.get("analysis_id") == ws.onboarding_id),
+                    None,
+                )
+                if match is None and documents:
+                    match = documents[-1]
+                if match is not None:
+                    return {
+                        "analysis_id": match.get("analysis_id", ws.onboarding_id),
+                        "summary": {
+                            "risk_score": match.get("risk_score", 0.0),
+                            "risk_level": match.get("risk_level", "low"),
+                            "flagged_modules": [],
+                        },
+                    }
+        except httpx.HTTPError as exc:
+            logger.warning("Detection engine unavailable for onboarding %s: %s", ws.onboarding_id, exc)
+
         # Fallback: for initiated onboarding without a pre-uploaded doc,
-        # return a minimal clean analysis.
+        # return a minimal clean analysis.  This is logged so operators
+        # notice when the upstream integration is missing.
+        logger.info("No document analysis available for onboarding %s — using clean fallback", ws.onboarding_id)
         return {
             "analysis_id": ws.onboarding_id,
             "summary": {"risk_score": 0.0, "risk_level": "low", "flagged_modules": []},
@@ -222,13 +250,30 @@ async def _run_document_analysis(ws: WorkflowState, settings: Settings) -> dict[
 
 
 async def _run_ubo_calculation(ws: WorkflowState, settings: Settings) -> UBOResult:
-    """Call the Sprint 3 UBO Graph Service for beneficial owner calculation."""
+    """Call the Sprint 3 UBO Graph Service for beneficial owner calculation.
+
+    The UBO graph uses synthetic entity IDs (e.g. ``co-abc12345``) that are
+    populated by the KYB adapter.  We prefer ``ws.kyb_lookup.entity_id``
+    when available, falling back to ``ws.onboarding_id`` for entities
+    that bypassed KYB.
+    """
+
+    # Prefer the entity_id resolved by KYB; this is the actual graph key
+    # the UBO service expects.  When KYB has not run (e.g. individual
+    # onboarding) fall back to the onboarding UUID — the UBO service
+    # returns an empty result for unknown entity_ids, which the calling
+    # code treats as "no beneficial owners identified".
+    entity_id = (
+        ws.kyb_lookup.entity_id
+        if (ws.kyb_lookup is not None and ws.kyb_lookup.entity_id)
+        else ws.onboarding_id
+    )
 
     try:
         async with httpx.AsyncClient(base_url=settings.ubo_service_url, timeout=30.0) as client:
             resp = await client.get(
                 "/api/v1/ubo/calculate",
-                params={"entity_id": ws.onboarding_id, "max_depth": 5, "threshold_percentage": 25.0},
+                params={"entity_id": entity_id, "max_depth": 5, "threshold_percentage": 25.0},
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -238,7 +283,7 @@ async def _run_ubo_calculation(ws: WorkflowState, settings: Settings) -> UBOResu
                     1 for o in owners if o.get("threshold_status") == "above_threshold"
                 )
                 return UBOResult(
-                    entity_id=ws.onboarding_id,
+                    entity_id=entity_id,
                     beneficial_owner_count=len(owners),
                     total_ownership_accounted=ubo_data.get("total_ownership_accounted", 0.0),
                     max_depth_traversed=ubo_data.get("max_depth_traversed", 0),
@@ -247,10 +292,10 @@ async def _run_ubo_calculation(ws: WorkflowState, settings: Settings) -> UBOResu
                     result_hash=ubo_data.get("result_hash", ""),
                 )
     except Exception as exc:
-        logger.warning("UBO service unavailable for entity %s: %s", ws.onboarding_id, exc)
+        logger.warning("UBO service unavailable for entity %s: %s", entity_id, exc)
 
     # Fallback: UBO service unavailable — return empty result
-    return UBOResult(entity_id=ws.onboarding_id)
+    return UBOResult(entity_id=entity_id)
 
 
 async def _run_pipeline(

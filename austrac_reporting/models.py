@@ -108,3 +108,22 @@ class DeadLetterEntry(BaseModel):
     retry_count: int = 0
     next_retry_at: datetime | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class UpdateReportRequest(BaseModel):
+    """Typed body for PATCH /reports/{report_id}.
+
+    Only an explicit, narrow allow-list of fields can be updated.  This
+    prevents the mass-assignment pattern where an authenticated caller
+    could overwrite ``report_id``, ``xml_content``, ``validation_errors``
+    or ``xsd_valid`` by submitting a hand-crafted JSON body.
+    """
+
+    status: str | None = Field(default=None, max_length=32)
+    notes: str | None = Field(default=None, max_length=2048)
+    assigned_to: str | None = Field(default=None, max_length=256)
+    # Free-form metadata the operator can attach for downstream tooling;
+    # ``validation_errors`` and ``xml_content`` are deliberately *not*
+    # exposed here so the gateway cannot be tricked into transmitting a
+    # report the server never validated.
+    metadata: dict[str, Any] = Field(default_factory=dict)

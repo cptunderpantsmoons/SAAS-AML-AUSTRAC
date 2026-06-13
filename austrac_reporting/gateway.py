@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+import os
 import ssl
 import tempfile
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 
@@ -30,6 +31,20 @@ class AUSTRACGateway:
         self._settings = settings or get_settings()
         self._dedup_cache = dedup_cache
         self._client: httpx.AsyncClient | None = None
+        # Track mTLS temp files so we can scrub them when the client is
+        # closed.  Leaving private key material on disk is a hard fail for
+        # a regulator-facing service.
+        self._mtls_temp_files: list[str] = []
+
+    def _scrub_mtls_temp_files(self) -> None:
+        for path in self._mtls_temp_files:
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                pass
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Failed to remove mTLS temp file %s: %s", path, exc)
+        self._mtls_temp_files.clear()
 
     async def _load_mtls_certs(self) -> tuple[str, str] | None:
         """Load client certificate and key from Secrets Manager."""
@@ -45,12 +60,26 @@ class AUSTRACGateway:
             if not cert_pem or not key_pem:
                 logger.warning("mTLS cert or key missing from secret; falling back to no mTLS")
                 return None
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as cert_file:
+            # Use restrictive file permissions on the temp key file.  ``mkstemp``
+            # returns an open file descriptor; we close it immediately because
+            # ssl.load_cert_chain only needs the path.  We track the paths so
+            # ``close()`` (or process exit) can scrub them.
+            import stat
+
+            cert_fd, cert_path = tempfile.mkstemp(suffix=".pem", prefix="austrac-cert-")
+            os.close(cert_fd)
+            os.chmod(cert_path, stat.S_IRUSR | stat.S_IWUSR)
+            with open(cert_path, "w") as cert_file:
                 cert_file.write(cert_pem)
-                cert_path = cert_file.name
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as key_file:
+            self._mtls_temp_files.append(cert_path)
+
+            key_fd, key_path = tempfile.mkstemp(suffix=".pem", prefix="austrac-key-")
+            os.close(key_fd)
+            os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)
+            with open(key_path, "w") as key_file:
                 key_file.write(key_pem)
-                key_path = key_file.name
+            self._mtls_temp_files.append(key_path)
+
             return cert_path, key_path
         except Exception as exc:
             logger.warning("Failed to load mTLS certs: %s — falling back to no mTLS", exc)
@@ -76,6 +105,7 @@ class AUSTRACGateway:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        self._scrub_mtls_temp_files()
 
     def _check_dedup(self, message_id: UUID) -> bool:
         """Return True if message_id already seen (duplicate)."""
@@ -105,7 +135,15 @@ class AUSTRACGateway:
         report_id: UUID,
     ) -> GatewayResult:
         """Transmit XML report to AUSTRAC with idempotency and pre-flight validation."""
-        message_id = uuid4()
+        # Derive a deterministic message_id from the report content so that
+        # genuine retries (same XML) are deduplicated, but a fresh UUID does
+        # not bypass the check.  A purely random UUID would never hit the
+        # dedup cache, defeating the purpose of the guard.
+        import hashlib
+
+        message_id = UUID(
+            hashlib.sha256(f"{report_type}|{report_id}|{xml_content}".encode()).hexdigest()[:32]
+        )
 
         if self._check_dedup(message_id):
             logger.info("Deduplication hit for message_id=%s", message_id)
